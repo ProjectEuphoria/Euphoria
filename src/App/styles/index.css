@@ -13,6 +13,46 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* ===== Scrollbar Utilities ===== */
+
+/* A) Hide scrollbar completely */
+.no-scrollbar {
+  scrollbar-width: none;           /* Firefox */
+  -ms-overflow-style: none;        /* IE/Edge legacy */
+}
+.no-scrollbar::-webkit-scrollbar {  /* Chrome/Safari/Edge */
+  display: none;
+}
+
+/* B) Minimal glass scrollbar */
+.glass-scrollbar {
+  scrollbar-width: thin;                          /* Firefox */
+  scrollbar-color: hsl(var(--muted)) transparent; /* thumb / track */
+}
+.glass-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.glass-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.glass-scrollbar::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted));          /* use your theme var */
+  border-radius: 9999px;
+  border: 2px solid transparent;          /* creates pill look */
+  background-clip: padding-box;
+}
+.glass-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--foreground));     /* slightly brighter on hover */
+}
+.no-scrollbar {
+  scrollbar-width: none;         /* Firefox */
+  -ms-overflow-style: none;      /* Old Edge/IE */
+}
+.no-scrollbar::-webkit-scrollbar { /* Chrome/Safari/Edge */
+  display: none;
+}
+
 a {
   font-weight: 550;
   color: #ffffff;

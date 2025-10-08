@@ -7,4 +7,4 @@ import { Sophie } from "./Sophie/agent";
 const agents = { Milo, Luna, Kai, Helena, Sophie } as const;
 export default agents;
 
-export type AgentName = keyof typeof agents; // "Milo" | "Luna" | ...
+export type AgentName = keyof typeof agents;
