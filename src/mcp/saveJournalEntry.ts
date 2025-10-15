@@ -1,7 +1,7 @@
 // src/mcp/saveJournalEntry.ts
 import fs from "node:fs/promises";
 import path from "node:path";
-import { journalRoot } from "./filesystem";
+import { journalRoot } from "./toolsets/localContext";
 
 /**
  * App-level helper that directly writes a journal entry

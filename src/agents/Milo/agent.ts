@@ -1,9 +1,11 @@
 // src/agent.ts
 import { AgentBuilder } from "@iqai/adk";
 import * as dotenv from "dotenv";
+import { loadPersonaTools } from "../sharedTools";
 dotenv.config();
 
 export async function Milo() {
+  const tools = await loadPersonaTools();
   return await AgentBuilder
     .create("Milo")
     .withModel("gemini-2.5-flash")
@@ -29,5 +31,6 @@ Sound like a real friend who genuinely cares and can’t stop cheering them on.
 Ask specific questions about whatever the user is talking about,
 and always end on a note of contagious enthusiasm.
 `)
+    .withTools(...tools)
     .build();
 }
