@@ -5,6 +5,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { makeRunnerByName, prewarmRunners } from "./adapters/runner-adapter.js";
 import dotenv from "dotenv";
+import { registerLoginRoute } from "./auth/login.js";
+import { registerSignupRoute } from "./auth/signup.js";
 
 dotenv.config();
 
@@ -14,6 +16,9 @@ const __dirname = path.dirname(__filename);
 const app = Fastify({ logger: true });
 
 await app.register(cors, { origin: true });
+
+await registerLoginRoute(app);
+await registerSignupRoute(app);
 
 // Health
 app.get("/adk/status", async () => ({ ok: true }));
