@@ -6,33 +6,54 @@ import {
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 
+// --- Expanded lexicons ---
 const POSITIVE = new Set([
-  "calm",
-  "peace",
-  "happy",
-  "joy",
-  "excited",
-  "confident",
-  "energized",
-  "grateful",
-  "motivated",
-  "hopeful",
+  // core positives
+  "calm","peace","peaceful","serene","content","contented","satisfied","relaxed","chill",
+  "happy","happier","happiest","joy","joyful","cheerful","glad","delighted","thrilled",
+  "excited","pumped","stoked","elated","ecstatic","euphoric",
+  "confident","assured","secure","certain","grounded","balanced",
+  "hopeful","optimistic","positive","sunny","upbeat",
+  "energized","energetic","vigorous","fresh","rested",
+  "grateful","thankful","gratitude","appreciative",
+  "motivated","driven","focused","productive","flow","inspired",
+  "proud","accomplished","strong","resilient","capable","brave","courageous",
+  "relieved","comforted","soothed",
+  "loving","loved","cared","supported","connected","included",
+  "curious","interested","engaged","excelling","winning",
+  "fun","playful","light","uplifted","optimism","hope",
+  // slang/modern
+  "hype","vibes","goodvibes","wholesome","cozy","snug","snuggly","lit","fire","pog",
+  // recovery/regulation words (often positive context)
+  "mindful","present","centered","collected","steady","patient","grace",
 ]);
 
 const NEGATIVE = new Set([
-  "sad",
-  "tired",
-  "anxious",
-  "overwhelmed",
-  "stressed",
-  "worried",
-  "angry",
-  "lonely",
-  "burned",
-  "exhausted",
-  "drained",
-  "frustrated",
+  // low mood
+  "sad","down","blue","gloomy","depressed","low","miserable","melancholy","somber",
+  "heartbroken","broken","hurt","pained","sorrow","upset",
+  // anxiety/stress
+  "anxious","nervous","worried","concerned","uneasy","onedge","tense","panicked","fearful","afraid","scared",
+  "stressed","overwhelmed","overloaded","overworked","overstimulated","frazzled","pressured",
+  // anger/irritation
+  "angry","mad","furious","enraged","irate","resentful","bitter","hostile","annoyed",
+  "irritated","frustrated","pissed","salty",
+  // fatigue/burnout
+  "tired","sleepy","drowsy","fatigued","exhausted","drained","spent","worn","wornout",
+  "burned","burnt","burnout","burnedout",
+  // loneliness/isolation
+  "lonely","isolated","alone","abandoned","neglected","unseen","unheard",
+  // shame/guilt/insecurity
+  "ashamed","shame","guilty","guilt","regret","regretful","embarrassed","insecure","inadequate","worthless","useless",
+  // confusion/hopelessness
+  "confused","lost","stuck","paralyzed","numb","empty","hollow","pointless","hopeless","pessimistic","doom","doomed",
+  // physical discomfort
+  "sick","ill","nauseous","hurting","aching","sore","pain","painful","headache","migraine",
+  // misc negatives & slang
+  "worst","awful","terrible","horrible","trash","bad","badly","rough","hard","difficult","brutal","chaotic",
+  "meh","ugh","yikes","bleh","crushed","wrecked","shattered","devastated",
 ]);
+
 
 function tokenize(text: string) {
   return text

@@ -11,6 +11,39 @@ const clientId = process.env.SPOTIFY_CLIENT_ID ?? "";
 const clientSecret = process.env.SPOTIFY_CLIENT_SECRET ?? "";
 
 let cachedToken: { accessToken: string; expiresAt: number } | null = null;
+let cachedGenres: string[] | null = null;
+
+const GENRE_SYNONYMS: Record<string, string> = {
+  focus: "focus",
+  study: "study",
+  chill: "chill",
+  relax: "chill",
+  relaxed: "chill",
+  lofi: "lo-fi",
+  lofihiphop: "lo-fi",
+  mellow: "chill",
+  gym: "work-out",
+  workout: "work-out",
+  hype: "dance",
+  sad: "sad",
+  upbeat: "dance",
+  party: "party",
+  anime: "anime",
+  gaming: "gaming",
+  happy: "happy",
+  confident: "confidence",
+  confidentvibes: "confidence",
+  sleep: "sleep",
+  sleepy: "sleep",
+  motivation: "motivation",
+  motivated: "motivation",
+  morning: "morning",
+  evening: "evening",
+  romance: "romance",
+  romantic: "romance",
+  throwback: "road-trip",
+  throwbackvibes: "road-trip",
+};
 
 async function getAccessToken() {
   if (!clientId || !clientSecret) {
@@ -25,7 +58,7 @@ async function getAccessToken() {
   const credentials = Buffer.from(`${clientId}:${clientSecret}`).toString(
     "base64",
   );
-  const response = await fetch("https://accounts.spotify.com/api/token", {
+const response = await fetch("https://accounts.spotify.com/api/token", {
     method: "POST",
     headers: {
       Authorization: `Basic ${credentials}`,
@@ -115,6 +148,39 @@ server.setRequestHandler(CallToolRequestSchema, async ({ params }) => {
   const token = await getAccessToken();
   const args = (params.arguments ?? {}) as Record<string, unknown>;
 
+  const ensureGenres = async () => {
+    if (cachedGenres) return cachedGenres;
+    const res = await fetch(
+      "https://api.spotify.com/v1/recommendations/available-genre-seeds",
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      },
+    );
+    if (res.ok) {
+      const data = await res.json();
+      cachedGenres = Array.isArray(data.genres) ? data.genres : [];
+    } else {
+      cachedGenres = [];
+    }
+    return cachedGenres;
+  };
+
+  const normalize = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+  const resolveSeedGenre = async (input: string) => {
+    const genres = await ensureGenres();
+    const normalizedInput = normalize(input);
+    const synonym = GENRE_SYNONYMS[normalizedInput];
+    if (synonym) return synonym;
+    const exact = genres.find((genre) => normalize(genre) === normalizedInput);
+    if (exact) return exact;
+    const partial = genres.find((genre) =>
+      normalize(genre).includes(normalizedInput) ||
+      normalizedInput.includes(normalize(genre)),
+    );
+    return partial ?? null;
+  };
+
   switch (params.name) {
     case "spotify_vibe_playlists": {
       const mood = typeof args.mood === "string" ? args.mood.trim() : "";
@@ -150,11 +216,17 @@ server.setRequestHandler(CallToolRequestSchema, async ({ params }) => {
             followers: pl.followers?.total ?? null,
           }))
         : [];
+      const payload = {
+        mood,
+        limit,
+        emptyReason: playlists.length === 0 ? "Spotify returned no playlists for this vibe" : undefined,
+        playlists,
+      };
       return {
         content: [
           {
             type: "text",
-            text: JSON.stringify({ mood, playlists }, null, 2),
+            text: JSON.stringify(payload, null, 2),
           },
         ],
       };
@@ -168,9 +240,12 @@ server.setRequestHandler(CallToolRequestSchema, async ({ params }) => {
       const limitRaw =
         typeof args.limit === "number" ? Math.floor(args.limit) : 5;
       const limit = Math.max(1, Math.min(20, limitRaw));
+      const resolved = await resolveSeedGenre(seedGenre);
+      const usedGenre = resolved ?? "chill";
+      const note = resolved ? undefined : "Requested genre not recognised by Spotify seeds; using 'chill' as a fallback.";
       const url = new URL("https://api.spotify.com/v1/recommendations");
       url.searchParams.set("limit", String(limit));
-      url.searchParams.set("seed_genres", seedGenre.replace(/\s+/g, "-"));
+      url.searchParams.set("seed_genres", usedGenre.replace(/\s+/g, "-"));
 
       const response = await fetch(url, {
         headers: {
@@ -192,15 +267,18 @@ server.setRequestHandler(CallToolRequestSchema, async ({ params }) => {
             url: track.external_urls?.spotify ?? null,
           }))
         : [];
+      const payload = {
+        requested: seedGenre,
+        resolvedGenre: usedGenre,
+        note,
+        emptyReason: tracks.length === 0 ? "Spotify returned no matches for this vibe" : undefined,
+        recommendations: tracks,
+      };
       return {
         content: [
           {
             type: "text",
-            text: JSON.stringify(
-              { seedGenre, recommendations: tracks },
-              null,
-              2,
-            ),
+            text: JSON.stringify(payload, null, 2),
           },
         ],
       };

@@ -6,7 +6,12 @@ let runnerPromise: Promise<Runner> | null = null;
 
 async function getSummarizerRunner(): Promise<Runner> {
   if (!runnerPromise) {
-    runnerPromise = AgentBuilder.create("weekly-mood-summarizer")
+    if (!process.env.GOOGLE_API_KEY) {
+      throw new Error(
+        "summarize_reflections requires GOOGLE_API_KEY to be configured for the Gemini model.",
+      );
+    }
+    runnerPromise = AgentBuilder.create("WeeklyMoodSummarizer")
       .withModel("gemini-2.5-flash")
       .withInstruction(
         [

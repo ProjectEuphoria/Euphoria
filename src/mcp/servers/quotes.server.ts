@@ -63,6 +63,11 @@ async function fetchQuote(keyword?: string) {
     : "https://zenquotes.io/api/random";
   const response = await fetch(endpoint);
   if (!response.ok) {
+    if (response.status === 429) {
+      throw new Error(
+        "ZenQuotes request failed: 429 (rate limited). Try again in a minute or reduce frequency.",
+      );
+    }
     throw new Error(`ZenQuotes request failed: ${response.status}`);
   }
   const data = await response.json();
@@ -99,6 +104,7 @@ server.setRequestHandler(CallToolRequestSchema, async ({ params }) => {
       const count = Math.max(1, Math.min(5, countRaw));
       const quotes = [];
       for (let i = 0; i < count; i++) {
+        await new Promise((resolve) => setTimeout(resolve, 250));
         quotes.push(await fetchQuote());
       }
       return {
