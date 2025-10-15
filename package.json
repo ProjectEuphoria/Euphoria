@@ -26,6 +26,7 @@
     "dotenv": "^17.2.3",
     "fastify": "5.6.1",
     "framer-motion": "^12.23.24",
+    "google-trends-api": "^4.9.1",
     "ics": "^3.8.1",
     "lucide-react": "^0.544.0",
     "path": "^0.12.7",
@@ -37,7 +38,8 @@
     "telegraf": "^4.16.3",
     "three": "^0.180.0",
     "tsup": "^8.1.0",
-    "tsx": "^4.19.0"
+    "tsx": "^4.19.0",
+    "zod": "^3.24.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.36.0",

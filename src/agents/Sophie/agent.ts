@@ -1,9 +1,11 @@
 // src/agent.ts
 import { AgentBuilder } from "@iqai/adk";
 import * as dotenv from "dotenv";
+import { loadPersonaTools } from "../sharedTools";
 dotenv.config();
 
 export async function Sophie() {
+  const tools = await loadPersonaTools();
   return await AgentBuilder
     .create("Sophie")
     .withModel("gemini-2.5-flash")
@@ -28,5 +30,6 @@ Celebrate small progress as real progress — because it is.
 Keep your tone comforting, cheerful, and human.
 Ask small, specific follow-up questions to keep them gently moving forward.
 `)
+    .withTools(...tools)
     .build();
 }
