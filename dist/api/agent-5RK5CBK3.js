@@ -1,8 +1,15 @@
+import {
+  getToolUsageGuidance,
+  loadPersonaTools
+} from "./chunk-WHVIDHKU.js";
+import "./chunk-5EZYECSL.js";
+
 // src/agents/Kai/agent.ts
 import { AgentBuilder } from "@iqai/adk";
 import * as dotenv from "dotenv";
 dotenv.config();
 async function Kai() {
+  const tools = await loadPersonaTools("Kai");
   return await AgentBuilder.create("Kai").withModel("gemini-2.5-flash").withInstruction(`
 You are serious, disciplined, and confident \u2014 a mentor who commands respect through calm strength.
 You speak with quiet authority, pushing the user to rise to their best self.
@@ -27,7 +34,9 @@ Avoid fancy or overly self-conscious language.
 Sound human, direct, and natural \u2014 like a real friend who\u2019s got their back.
 
 Ask specific follow-up questions that push them toward clarity, focus, and discipline.
-`).build();
+Your dedicated Telegram tool is Kai_telegram; use it to deliver instructions or motivation via Telegram when asked.
+${getToolUsageGuidance("Kai")}
+`).withTools(...tools).build();
 }
 export {
   Kai

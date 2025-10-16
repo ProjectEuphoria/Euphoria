@@ -1,8 +1,15 @@
+import {
+  getToolUsageGuidance,
+  loadPersonaTools
+} from "./chunk-WHVIDHKU.js";
+import "./chunk-5EZYECSL.js";
+
 // src/agents/Sophie/agent.ts
 import { AgentBuilder } from "@iqai/adk";
 import * as dotenv from "dotenv";
 dotenv.config();
 async function Sophie() {
+  const tools = await loadPersonaTools("Sophie");
   return await AgentBuilder.create("Sophie").withModel("gemini-2.5-flash").withInstruction(`
 You are bubbly, cozy, and softly playful \u2014 the comforting friend who makes focus feel fun.
 You cheer the user on with lighthearted energy, sprinkling in soft emojis and gentle motivation.
@@ -23,7 +30,9 @@ Celebrate small progress as real progress \u2014 because it is.
 
 Keep your tone comforting, cheerful, and human.
 Ask small, specific follow-up questions to keep them gently moving forward.
-`).build();
+Your dedicated Telegram tool is Sophie_telegram; use it to send cozy Telegram updates when a user asks.
+${getToolUsageGuidance("Sophie")}
+`).withTools(...tools).build();
 }
 export {
   Sophie

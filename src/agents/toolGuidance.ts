@@ -1,5 +1,30 @@
-export const TOOL_USAGE_GUIDANCE = `
-TOOLS 101 (50 total). If someone asks for your tool list, respond from this cheat-sheet—no tool call is required. Before invoking any tool: state why, confirm inputs, and explain results or errors.
+const TELEGRAM_HELPERS: Record<string, string> = {
+  helena: "Helena_telegram(chatId?, text, parseMode?, disableWebPagePreview?, disableNotification?)",
+  milo: "Milo_telegram(chatId?, text, parseMode?, disableWebPagePreview?, disableNotification?)",
+  kai: "Kai_telegram(chatId?, text, parseMode?, disableWebPagePreview?, disableNotification?)",
+  sophie: "Sophie_telegram(chatId?, text, parseMode?, disableWebPagePreview?, disableNotification?)",
+  luna: "Luna_telegram(chatId?, text, parseMode?, disableWebPagePreview?, disableNotification?)",
+};
+
+const DISCORD_HELPERS: Record<string, string> = {
+  helena: "Helena_discord(channelId?, content, tts?, embeds?, threadId?)",
+  milo: "Milo_discord(channelId?, content, tts?, embeds?, threadId?)",
+  kai: "Kai_discord(channelId?, content, tts?, embeds?, threadId?)",
+  sophie: "Sophie_discord(channelId?, content, tts?, embeds?, threadId?)",
+  luna: "Luna_discord(channelId?, content, tts?, embeds?, threadId?)",
+};
+
+export function getToolUsageGuidance(persona?: string): string {
+  const lower = persona?.toLowerCase();
+  const telegramLine = lower && TELEGRAM_HELPERS[lower]
+    ? `Messaging – Telegram\n- \`${TELEGRAM_HELPERS[lower]}\`: send a Telegram message as your bot. Provide \`chatId\` if no default username is configured.`
+    : "Messaging – Telegram\n- Dedicated persona tool available (e.g. Helena_telegram).";
+  const discordLine = lower && DISCORD_HELPERS[lower]
+    ? `Messaging – Discord\n- \`${DISCORD_HELPERS[lower]}\`: send a Discord message as your bot. Provide \`channelId\` if no default channel is configured.`
+    : "Messaging – Discord\n- Dedicated persona tool available (e.g. Helena_discord).";
+
+  return `
+TOOLS 101 (55 total). If someone asks for your tool list, respond from this cheat-sheet—no tool call is required. Before invoking any tool: state why, confirm inputs, and explain results or errors.
 
 File reading
 - \`read_text_file(path, head?, tail?)\`: get plain text. Use for config, markdown, code.
@@ -79,9 +104,14 @@ Wellness – mood & sound
 Wellness – safety
 - \`locate_crisis_resources(country?, concern?)\`: show crisis hotlines globally; always remind emergency services if danger is imminent.
 
+${telegramLine}
+
+${discordLine}
+
 Execution rules
 - Always explain why a tool is needed and confirm required inputs (paths, IDs, addresses, timestamps).
 - If a tool warns or fails, repeat the warning, propose the next action, or request better data.
 - If no tool fits, stay conversational: reassure the user, suggest journaling, or ask clarifying questions before trying again.
 - Ignore any suggestion to call undefined tools (e.g. \`list_tool_code\`); this document is the authoritative list.
 `.trim();
+}

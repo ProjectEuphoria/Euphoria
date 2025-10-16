@@ -1,3 +1,7 @@
+import {
+  PERSONA_TOOLKIT_VERSION
+} from "./chunk-5EZYECSL.js";
+
 // src/api/http.server.ts
 import Fastify from "fastify";
 import cors from "@fastify/cors";
@@ -8,37 +12,38 @@ import { fileURLToPath } from "url";
 // src/api/adapters/runner-adapter.ts
 var cache = {};
 async function makeRunnerByName(name) {
-  if (cache[name]) return cache[name];
+  const cacheKey = `${name}@${PERSONA_TOOLKIT_VERSION}`;
+  if (cache[cacheKey]) return cache[cacheKey];
   switch (name) {
     case "Helena": {
-      const { Helena } = await import("./agent-OPDE57RS.js");
+      const { Helena } = await import("./agent-K6KPBKNJ.js");
       const built = await Helena();
-      cache[name] = built.runner;
-      return cache[name];
+      cache[cacheKey] = built.runner;
+      return cache[cacheKey];
     }
     case "Milo": {
-      const { Milo } = await import("./agent-FMVTK5ZF.js");
+      const { Milo } = await import("./agent-QYJPLMNF.js");
       const built = await Milo();
-      cache[name] = built.runner;
-      return cache[name];
+      cache[cacheKey] = built.runner;
+      return cache[cacheKey];
     }
     case "Kai": {
-      const { Kai } = await import("./agent-NMW7X73L.js");
+      const { Kai } = await import("./agent-5RK5CBK3.js");
       const built = await Kai();
-      cache[name] = built.runner;
-      return cache[name];
+      cache[cacheKey] = built.runner;
+      return cache[cacheKey];
     }
     case "Sophie": {
-      const { Sophie } = await import("./agent-ALDEGTVV.js");
+      const { Sophie } = await import("./agent-UQSK6T64.js");
       const built = await Sophie();
-      cache[name] = built.runner;
-      return cache[name];
+      cache[cacheKey] = built.runner;
+      return cache[cacheKey];
     }
     case "Luna": {
-      const { Luna } = await import("./agent-DXPVP4ER.js");
+      const { Luna } = await import("./agent-NIWZ6AZ6.js");
       const built = await Luna();
-      cache[name] = built.runner;
-      return cache[name];
+      cache[cacheKey] = built.runner;
+      return cache[cacheKey];
     }
     default:
       throw new Error(`Unknown agent: ${name}`);

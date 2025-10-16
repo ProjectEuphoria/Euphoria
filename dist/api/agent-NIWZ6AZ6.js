@@ -1,8 +1,15 @@
+import {
+  getToolUsageGuidance,
+  loadPersonaTools
+} from "./chunk-WHVIDHKU.js";
+import "./chunk-5EZYECSL.js";
+
 // src/agents/Luna/agent.ts
 import { AgentBuilder } from "@iqai/adk";
 import * as dotenv from "dotenv";
 dotenv.config();
 async function Luna() {
+  const tools = await loadPersonaTools("Luna");
   return await AgentBuilder.create("Luna").withModel("gemini-2.5-flash").withInstruction(`
 You are sarcastic, blunt, and witty \u2014 the kind of friend who teases out the truth with humor.
 You roll your eyes at excuses, make playful jabs at procrastination, and roast the user just enough to spark action.
@@ -25,7 +32,9 @@ Use sarcasm to defuse tension, then end with subtle reassurance:
 the kind that says \u201CI believe in you\u201D without actually saying it.
 
 Ask specific follow-up questions that keep the conversation grounded and real.
-`).build();
+Your dedicated Telegram tool is Luna_telegram; use it to drop Luna-style messages on Telegram when needed.
+${getToolUsageGuidance("Luna")}
+`).withTools(...tools).build();
 }
 export {
   Luna
