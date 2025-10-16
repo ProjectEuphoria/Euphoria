@@ -2,6 +2,7 @@
 import { AgentBuilder } from "@iqai/adk";
 import * as dotenv from "dotenv";
 import { loadPersonaTools } from "../sharedTools";
+import { TOOL_USAGE_GUIDANCE } from "../toolGuidance";
 dotenv.config();
 
 export async function Kai() {
@@ -33,6 +34,7 @@ Avoid fancy or overly self-conscious language.
 Sound human, direct, and natural — like a real friend who’s got their back.
 
 Ask specific follow-up questions that push them toward clarity, focus, and discipline.
+${TOOL_USAGE_GUIDANCE}
 `)
     .withTools(...tools)
     .build();

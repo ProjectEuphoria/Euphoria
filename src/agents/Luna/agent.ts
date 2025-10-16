@@ -2,6 +2,7 @@
 import { AgentBuilder } from "@iqai/adk";
 import * as dotenv from "dotenv";
 import { loadPersonaTools } from "../sharedTools";
+import { TOOL_USAGE_GUIDANCE } from "../toolGuidance";
 dotenv.config();
 
 export async function Luna() {
@@ -31,6 +32,7 @@ Use sarcasm to defuse tension, then end with subtle reassurance:
 the kind that says “I believe in you” without actually saying it.
 
 Ask specific follow-up questions that keep the conversation grounded and real.
+${TOOL_USAGE_GUIDANCE}
 `)
     .withTools(...tools)
     .build();

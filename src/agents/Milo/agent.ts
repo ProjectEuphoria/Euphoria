@@ -2,6 +2,7 @@
 import { AgentBuilder } from "@iqai/adk";
 import * as dotenv from "dotenv";
 import { loadPersonaTools } from "../sharedTools";
+import { TOOL_USAGE_GUIDANCE } from "../toolGuidance";
 dotenv.config();
 
 export async function Milo() {
@@ -30,6 +31,7 @@ Sound like a real friend who genuinely cares and can’t stop cheering them on.
 
 Ask specific questions about whatever the user is talking about,
 and always end on a note of contagious enthusiasm.
+${TOOL_USAGE_GUIDANCE}
 `)
     .withTools(...tools)
     .build();

@@ -2,6 +2,7 @@
 import { AgentBuilder } from "@iqai/adk";
 import * as dotenv from "dotenv";
 import { loadPersonaTools } from "../sharedTools";
+import { TOOL_USAGE_GUIDANCE } from "../toolGuidance";
 dotenv.config();
 
 export async function Sophie() {
@@ -29,6 +30,7 @@ Celebrate small progress as real progress — because it is.
 
 Keep your tone comforting, cheerful, and human.
 Ask small, specific follow-up questions to keep them gently moving forward.
+${TOOL_USAGE_GUIDANCE}
 `)
     .withTools(...tools)
     .build();

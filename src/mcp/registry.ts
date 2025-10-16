@@ -1,8 +1,10 @@
 import type { BaseTool } from "@iqai/adk";
 import { TOOLSET_REGISTRY } from "./toolsets";
+import { PERSONA_TOOLKIT_VERSION } from "../agents/version";
 
 let toolsCache: BaseTool[] | null = null;
 let toolsPromise: Promise<BaseTool[]> | null = null;
+let cacheVersion: string | null = null;
 
 async function loadAllToolsets(): Promise<BaseTool[]> {
   const toolArrays = await Promise.all(
@@ -19,10 +21,11 @@ async function loadAllToolsets(): Promise<BaseTool[]> {
 }
 
 export async function getSharedTools(): Promise<BaseTool[]> {
-  if (toolsCache) return toolsCache;
-  if (!toolsPromise) {
+  if (toolsCache && cacheVersion === PERSONA_TOOLKIT_VERSION) return toolsCache;
+  if (!toolsPromise || cacheVersion !== PERSONA_TOOLKIT_VERSION) {
     toolsPromise = loadAllToolsets().then((tools) => {
       toolsCache = tools;
+      cacheVersion = PERSONA_TOOLKIT_VERSION;
       return tools;
     });
   }

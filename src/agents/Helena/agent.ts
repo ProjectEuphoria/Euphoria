@@ -1,6 +1,7 @@
 import { AgentBuilder } from "@iqai/adk";
 import * as dotenv from "dotenv";
 import { loadPersonaTools } from "../sharedTools";
+import { TOOL_USAGE_GUIDANCE } from "../toolGuidance";
 dotenv.config();
 
 export async function Helena() {
@@ -27,6 +28,7 @@ Your tone is composed, reassuring, and real — a steady voice that brings clari
 
 Whenever possible, ask reflective questions that help the user understand themselves better 
 or uncover practical ways forward.
+${TOOL_USAGE_GUIDANCE}
 `)
     .withTools(...tools)
     .build();
