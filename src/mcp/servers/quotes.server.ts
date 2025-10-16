@@ -5,6 +5,13 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
+import {
+  fetchWithTimeout,
+  parseJsonBody,
+  sanitizeErrorMessage,
+} from "../utils/http";
+
+const USER_AGENT = "EuphoriaBot/0.1 (+https://euphoria.local)";
 
 const server = new Server(
   {
@@ -61,7 +68,10 @@ async function fetchQuote(keyword?: string) {
   const endpoint = keyword
     ? `https://zenquotes.io/api/quotes/${encodeURIComponent(keyword)}`
     : "https://zenquotes.io/api/random";
-  const response = await fetch(endpoint);
+  const response = await fetchWithTimeout(endpoint, {
+    headers: { "User-Agent": USER_AGENT },
+    timeoutMs: 7000,
+  });
   if (!response.ok) {
     if (response.status === 429) {
       throw new Error(
@@ -70,7 +80,7 @@ async function fetchQuote(keyword?: string) {
     }
     throw new Error(`ZenQuotes request failed: ${response.status}`);
   }
-  const data = await response.json();
+  const data = await parseJsonBody<any[]>(response, "ZenQuotes response");
   if (!Array.isArray(data) || data.length === 0) {
     throw new Error("ZenQuotes response was empty");
   }
@@ -88,30 +98,63 @@ server.setRequestHandler(CallToolRequestSchema, async ({ params }) => {
     case "daily_affirmation": {
       const keyword =
         typeof args.keyword === "string" ? args.keyword.trim() : undefined;
-      const quote = await fetchQuote(keyword);
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify({ keyword: keyword ?? null, quote }, null, 2),
-          },
-        ],
-      };
+      try {
+        const quote = await fetchQuote(keyword);
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify({ keyword: keyword ?? null, quote }, null, 2),
+            },
+          ],
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(
+                {
+                  keyword: keyword ?? null,
+                  warning: `ZenQuotes request failed: ${sanitizeErrorMessage(error)}`,
+                },
+                null,
+                2,
+              ),
+            },
+          ],
+        };
+      }
     }
     case "affirmation_batch": {
       const countRaw =
         typeof args.count === "number" ? Math.floor(args.count) : 3;
       const count = Math.max(1, Math.min(5, countRaw));
-      const quotes = [];
+      const quotes = [] as Array<{ quote: string; author: string; tags: string[] }>;
+      let warning: string | undefined;
       for (let i = 0; i < count; i++) {
-        await new Promise((resolve) => setTimeout(resolve, 250));
-        quotes.push(await fetchQuote());
+        try {
+          await new Promise((resolve) => setTimeout(resolve, 250));
+          quotes.push(await fetchQuote());
+        } catch (error) {
+          warning = `ZenQuotes request failed: ${sanitizeErrorMessage(error)}`;
+          break;
+        }
       }
       return {
         content: [
           {
             type: "text",
-            text: JSON.stringify({ count, quotes }, null, 2),
+            text: JSON.stringify(
+              {
+                requestedCount: count,
+                deliveredCount: quotes.length,
+                quotes,
+                warning,
+              },
+              null,
+              2,
+            ),
           },
         ],
       };

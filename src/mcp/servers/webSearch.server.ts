@@ -5,6 +5,13 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
+import {
+  fetchWithTimeout,
+  parseJsonBody,
+  sanitizeErrorMessage,
+} from "../utils/http";
+
+const USER_AGENT = "EuphoriaBot/0.1 (+https://euphoria.local)";
 
 const server = new Server(
   {
@@ -74,50 +81,93 @@ server.setRequestHandler(CallToolRequestSchema, async ({ params }) => {
   searchUrl.searchParams.set("no_html", "1");
   searchUrl.searchParams.set("skip_disambig", "1");
 
-  const response = await fetch(searchUrl);
-  if (!response.ok) {
-    throw new Error(
-      `DuckDuckGo request failed with status ${response.status}`,
+  try {
+    const response = await fetchWithTimeout(searchUrl, {
+      headers: { "User-Agent": USER_AGENT },
+      timeoutMs: 8000,
+    });
+    if (!response.ok) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(
+              {
+                query,
+                warning: `DuckDuckGo request failed with status ${response.status}`,
+                results: [],
+              },
+              null,
+              2,
+            ),
+          },
+        ],
+      };
+    }
+
+    const payload = await parseJsonBody<any>(
+      response,
+      "DuckDuckGo Instant Answer",
     );
+
+    const related = Array.isArray(payload.RelatedTopics)
+      ? payload.RelatedTopics.flatMap((item: any) => {
+          if (item.Topics) {
+            return item.Topics;
+          }
+          return item;
+        })
+      : [];
+
+    const items = related
+      .filter(
+        (item: any) =>
+          item?.FirstURL && typeof item.FirstURL === "string" && item.Text,
+      )
+      .slice(0, maxResults)
+      .map((item: any) => ({
+        title: item.Text,
+        url: item.FirstURL,
+      }));
+
+    const result = {
+      query,
+      heading: payload.Heading ?? null,
+      abstract: payload.AbstractText ?? null,
+      image: payload.Image ?? null,
+      results: items,
+      note:
+        items.length === 0
+          ? "No direct links were available for this query."
+          : undefined,
+    };
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify(result, null, 2),
+        },
+      ],
+    };
+  } catch (error) {
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify(
+            {
+              query,
+              warning: `DuckDuckGo search failed: ${sanitizeErrorMessage(error)}`,
+              results: [],
+            },
+            null,
+            2,
+          ),
+        },
+      ],
+    };
   }
-  const payload = await response.json();
-
-  const related = Array.isArray(payload.RelatedTopics)
-    ? payload.RelatedTopics.flatMap((item: any) => {
-        if (item.Topics) {
-          return item.Topics;
-        }
-        return item;
-      })
-    : [];
-
-  const items = related
-    .filter(
-      (item: any) =>
-        item?.FirstURL && typeof item.FirstURL === "string" && item.Text,
-    )
-    .slice(0, maxResults)
-    .map((item: any) => ({
-      title: item.Text,
-      url: item.FirstURL,
-    }));
-
-  const result = {
-    query,
-    heading: payload.Heading ?? null,
-    abstract: payload.AbstractText ?? null,
-    image: payload.Image ?? null,
-    results: items,
-  };
-
-  return {
-    content: [
-      {
-        type: "text",
-        text: JSON.stringify(result, null, 2),
-      },
-    ],
-  };
 });
 
 async function main() {

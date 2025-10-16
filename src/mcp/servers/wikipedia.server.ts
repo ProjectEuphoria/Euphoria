@@ -5,6 +5,13 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
+import {
+  fetchWithTimeout,
+  parseJsonBody,
+  sanitizeErrorMessage,
+} from "../utils/http";
+
+const USER_AGENT = "EuphoriaBot/0.1 (+https://euphoria.local)";
 
 const server = new Server(
   {
@@ -72,37 +79,81 @@ server.setRequestHandler(CallToolRequestSchema, async ({ params }) => {
       if (!title) {
         throw new Error("wikipedia_summary requires a 'title' string");
       }
-      const summaryUrl = new URL(
-        `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(
-          title,
-        )}`,
-      );
-      const response = await fetch(summaryUrl, {
-        headers: { "User-Agent": "EuphoriaBot/0.1 (contact: support@euphoria)" },
-      });
-      if (!response.ok) {
-        throw new Error(
-          `Wikipedia summary request failed: ${response.status}`,
+      try {
+        const summaryUrl = new URL(
+          `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(
+            title,
+          )}`,
         );
-      }
-      const data = await response.json();
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify(
+        const response = await fetchWithTimeout(summaryUrl, {
+          headers: { "User-Agent": USER_AGENT },
+        });
+        if (response.status === 404) {
+          return {
+            content: [
               {
-                title: data.title,
-                extract: data.extract,
-                description: data.description ?? null,
-                url: data.content_urls?.desktop?.page ?? null,
+                type: "text",
+                text: JSON.stringify(
+                  { title, warning: "No Wikipedia page found for that title." },
+                  null,
+                  2,
+                ),
               },
-              null,
-              2,
-            ),
-          },
-        ],
-      };
+            ],
+          };
+        }
+        if (!response.ok) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify(
+                  {
+                    title,
+                    warning: `Wikipedia summary request failed: ${response.status}`,
+                  },
+                  null,
+                  2,
+                ),
+              },
+            ],
+          };
+        }
+        const data = await parseJsonBody<any>(response, "Wikipedia summary");
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(
+                {
+                  title: data.title,
+                  extract: data.extract,
+                  description: data.description ?? null,
+                  url: data.content_urls?.desktop?.page ?? null,
+                },
+                null,
+                2,
+              ),
+            },
+          ],
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(
+                {
+                  title,
+                  warning: `Wikipedia summary failed: ${sanitizeErrorMessage(error)}`,
+                },
+                null,
+                2,
+              ),
+            },
+          ],
+        };
+      }
     }
     case "wikipedia_search": {
       const query = typeof args.query === "string" ? args.query.trim() : "";
@@ -112,36 +163,81 @@ server.setRequestHandler(CallToolRequestSchema, async ({ params }) => {
       const limitRaw =
         typeof args.limit === "number" ? Math.floor(args.limit) : 5;
       const limit = Math.max(1, Math.min(10, limitRaw));
-      const searchUrl = new URL("https://en.wikipedia.org/w/api.php");
-      searchUrl.searchParams.set("action", "query");
-      searchUrl.searchParams.set("list", "search");
-      searchUrl.searchParams.set("format", "json");
-      searchUrl.searchParams.set("srsearch", query);
-      searchUrl.searchParams.set("srlimit", String(limit));
+      try {
+        const searchUrl = new URL("https://en.wikipedia.org/w/api.php");
+        searchUrl.searchParams.set("action", "query");
+        searchUrl.searchParams.set("list", "search");
+        searchUrl.searchParams.set("format", "json");
+        searchUrl.searchParams.set("srsearch", query);
+        searchUrl.searchParams.set("srlimit", String(limit));
 
-      const response = await fetch(searchUrl, {
-        headers: { "User-Agent": "EuphoriaBot/0.1 (contact: support@euphoria)" },
-      });
-      if (!response.ok) {
-        throw new Error(`Wikipedia search failed: ${response.status}`);
+        const response = await fetchWithTimeout(searchUrl, {
+          headers: { "User-Agent": USER_AGENT },
+        });
+        if (!response.ok) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify(
+                  {
+                    query,
+                    warning: `Wikipedia search failed: ${response.status}`,
+                    results: [],
+                  },
+                  null,
+                  2,
+                ),
+              },
+            ],
+          };
+        }
+        const data = await parseJsonBody<any>(response, "Wikipedia search");
+        const results = Array.isArray(data.query?.search)
+          ? data.query.search.map((item: any) => ({
+              title: item.title,
+              snippet: item.snippet?.replace(/<\/?span[^>]*>/g, "") ?? "",
+              pageId: item.pageid,
+              url: `https://en.wikipedia.org/?curid=${item.pageid}`,
+            }))
+          : [];
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(
+                {
+                  query,
+                  results,
+                  note:
+                    results.length === 0
+                      ? "Wikipedia did not return any matches for that search."
+                      : undefined,
+                },
+                null,
+                2,
+              ),
+            },
+          ],
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(
+                {
+                  query,
+                  warning: `Wikipedia search failed: ${sanitizeErrorMessage(error)}`,
+                  results: [],
+                },
+                null,
+                2,
+              ),
+            },
+          ],
+        };
       }
-      const data = await response.json();
-      const results = Array.isArray(data.query?.search)
-        ? data.query.search.map((item: any) => ({
-            title: item.title,
-            snippet: item.snippet?.replace(/<\/?span[^>]*>/g, "") ?? "",
-            pageId: item.pageid,
-            url: `https://en.wikipedia.org/?curid=${item.pageid}`,
-          }))
-        : [];
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify({ query, results }, null, 2),
-          },
-        ],
-      };
     }
     default:
       throw new Error(`Unknown tool: ${params.name}`);

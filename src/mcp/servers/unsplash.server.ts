@@ -5,6 +5,11 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
+import {
+  fetchWithTimeout,
+  parseJsonBody,
+  sanitizeErrorMessage,
+} from "../utils/http";
 
 const accessKey = process.env.UNSPLASH_ACCESS_KEY ?? "";
 
@@ -64,9 +69,22 @@ server.setRequestHandler(CallToolRequestSchema, async ({ params }) => {
     throw new Error(`Unknown tool: ${params.name}`);
   }
   if (!accessKey) {
-    throw new Error(
-      "Unsplash search requires UNSPLASH_ACCESS_KEY environment variable.",
-    );
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify(
+            {
+              warning:
+                "Unsplash search requires UNSPLASH_ACCESS_KEY to be set on the server.",
+              images: [],
+            },
+            null,
+            2,
+          ),
+        },
+      ],
+    };
   }
   const args = (params.arguments ?? {}) as Record<string, unknown>;
   const query = typeof args.query === "string" ? args.query.trim() : "";
@@ -81,49 +99,107 @@ server.setRequestHandler(CallToolRequestSchema, async ({ params }) => {
   const color =
     typeof args.color === "string" ? args.color.replace("#", "") : undefined;
 
-  const apiUrl = new URL("https://api.unsplash.com/search/photos");
-  apiUrl.searchParams.set("query", query);
-  apiUrl.searchParams.set("per_page", String(perPage));
-  if (orientation) apiUrl.searchParams.set("orientation", orientation);
-  if (color) apiUrl.searchParams.set("color", color);
+  try {
+    const apiUrl = new URL("https://api.unsplash.com/search/photos");
+    apiUrl.searchParams.set("query", query);
+    apiUrl.searchParams.set("per_page", String(perPage));
+    if (orientation) apiUrl.searchParams.set("orientation", orientation);
+    if (color) apiUrl.searchParams.set("color", color);
 
-  const response = await fetch(apiUrl, {
-    headers: {
-      Authorization: `Client-ID ${accessKey}`,
-      "Accept-Version": "v1",
-    },
-  });
-  if (!response.ok) {
-    throw new Error(`Unsplash API request failed: ${response.status}`);
-  }
-  const data = await response.json();
-  const results = Array.isArray(data.results)
-    ? data.results.map((item: any) => ({
-        id: item.id,
-        description: item.description ?? item.alt_description ?? "",
-        photographer: item.user?.name ?? null,
-        urls: item.urls,
-        color: item.color ?? null,
-      }))
-    : [];
-
-  return {
-    content: [
-      {
-        type: "text",
-        text: JSON.stringify(
-          {
-            query,
-            orientation: orientation ?? null,
-            color: color ?? null,
-            images: results,
-          },
-          null,
-          2,
-        ),
+    const response = await fetchWithTimeout(apiUrl, {
+      headers: {
+        Authorization: `Client-ID ${accessKey}`,
+        "Accept-Version": "v1",
       },
-    ],
-  };
+      timeoutMs: 8000,
+    });
+    if (response.status === 401 || response.status === 403) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(
+              {
+                query,
+                warning:
+                  "Unsplash rejected the request (401/403). Check that UNSPLASH_ACCESS_KEY is valid and not rate limited.",
+                images: [],
+              },
+              null,
+              2,
+            ),
+          },
+        ],
+      };
+    }
+    if (!response.ok) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(
+              {
+                query,
+                warning: `Unsplash API request failed: ${response.status}`,
+                images: [],
+              },
+              null,
+              2,
+            ),
+          },
+        ],
+      };
+    }
+    const data = await parseJsonBody<any>(response, "Unsplash search");
+    const results = Array.isArray(data.results)
+      ? data.results.map((item: any) => ({
+          id: item.id,
+          description: item.description ?? item.alt_description ?? "",
+          photographer: item.user?.name ?? null,
+          urls: item.urls,
+          color: item.color ?? null,
+        }))
+      : [];
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify(
+            {
+              query,
+              orientation: orientation ?? null,
+              color: color ?? null,
+              images: results,
+              note:
+                results.length === 0
+                  ? "Unsplash returned no matches for that vibe. Try a broader query."
+                  : undefined,
+            },
+            null,
+            2,
+          ),
+        },
+      ],
+    };
+  } catch (error) {
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify(
+            {
+              query,
+              warning: `Unsplash search failed: ${sanitizeErrorMessage(error)}`,
+              images: [],
+            },
+            null,
+            2,
+          ),
+        },
+      ],
+    };
+  }
 });
 
 async function main() {

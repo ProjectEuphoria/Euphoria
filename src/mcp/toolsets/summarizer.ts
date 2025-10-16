@@ -1,6 +1,7 @@
 import { AgentBuilder, createTool } from "@iqai/adk";
 import type { Runner } from "@iqai/adk";
 import { z } from "@iqai/adk/node_modules/zod";
+import { sanitizeErrorMessage } from "../utils/http";
 
 let runnerPromise: Promise<Runner> | null = null;
 
@@ -55,7 +56,17 @@ export const summarizerTool = createTool({
       )
       .join("\n");
 
-    const raw = await runner.ask(prompt);
+    let raw: unknown;
+    try {
+      raw = await runner.ask(prompt);
+    } catch (error) {
+      return {
+        summary: "",
+        highlights: cleanedEntries.slice(0, Math.min(3, cleanedEntries.length)),
+        action_items: [],
+        warning: `Summarizer request failed: ${sanitizeErrorMessage(error)}`,
+      };
+    }
     try {
       const trimmed = typeof raw === "string" ? raw.trim() : String(raw);
       const jsonStart = trimmed.indexOf("{");
