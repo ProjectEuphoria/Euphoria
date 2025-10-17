@@ -2,6 +2,8 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Mail, Lock, Eye, EyeOff, ArrowRight, Shield, UserPlus, LogIn } from "lucide-react";
 import LiquidEther from "../../Components/Effects/LiquidEther";
+import {useNavigate } from "react-router-dom";
+
 
 const panelVariants = {
   initial: { opacity: 0, y: 24 },
@@ -34,6 +36,7 @@ export default function ModernAuthUI() {
   const [displayName, setDisplayName] = useState("");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
+  const navigate = useNavigate();
 
   // errors+touched
   const [errors, setErrors] = useState<{ email?: string; password?: string; displayName?: string }>({});
@@ -74,8 +77,8 @@ export default function ModernAuthUI() {
         next.password = !password
           ? "Password is required"
           : pwIssues(password).length
-          ? `Weak password: ${pwIssues(password).join(", ")}`
-          : undefined;
+            ? `Weak password: ${pwIssues(password).join(", ")}`
+            : undefined;
       }
       if (key === "displayName") {
         next.displayName = isSignIn ? undefined : (nameIssue(displayName) || undefined);
@@ -94,18 +97,31 @@ export default function ModernAuthUI() {
 
     try {
       setLoading(true);
-      const endpoint = isSignIn ? "/api/auth/login" : "/api/auth/signup";
       const payload = isSignIn ? { email, password } : { email, password, displayName };
 
-      const res = await fetch(endpoint, {
+      const res = isSignIn ? await fetch("/adk/api/auth/signin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(payload)
+      }) : await fetch("/adk/api/auth/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || "Request failed");
+      const data = await res.json()
+      console.log(data)
+      if (data.error) {
+        setMessage(`${data.error}`);
+      } else if (data.user) {
+        // ✅ Always go to homepage
+          navigate("/", { replace: true });
+          return;
+      }
 
-      setMessage(`✅ ${isSignIn ? "Signed in" : "Account created"} successfully!`);
+
+
+
       // TODO: redirect after success (e.g., to /chat)
     } catch (err: any) {
       setMessage(`❌ ${err.message || "Something went wrong"}`);
@@ -116,8 +132,7 @@ export default function ModernAuthUI() {
 
   // dynamic classes for error state
   const fieldWrap = (hasErr?: boolean) =>
-    `flex items-center gap-2 rounded-lg border px-3 py-2 bg-white/10 ${
-      hasErr ? "border-red-400/70 ring-1 ring-red-400/40" : "border-white/20"
+    `flex items-center gap-2 rounded-lg border px-3 py-2 bg-white/10 ${hasErr ? "border-red-400/70 ring-1 ring-red-400/40" : "border-white/20"
     }`;
 
   const help = (msg?: string) =>
@@ -251,7 +266,7 @@ export default function ModernAuthUI() {
               {/* tiny strength hint */}
               {!errors.password && password.length > 0 && (
                 <p className="mt-1 text-[11px] text-white/60">
-                  Strength: {["weak","okay","good","great"][Math.min(3, Math.floor(password.length/4))]}
+                  Strength: {["weak", "okay", "good", "great"][Math.min(3, Math.floor(password.length / 4))]}
                 </p>
               )}
             </div>

@@ -1,6 +1,7 @@
 import { useState, type FC } from "react";
 import { Globe, Menu, X } from "lucide-react";
 import Logo from "../Brand/Logo";
+import LogoutBtn from "../LogoutBtn";
 
 type NavLink = { href: string; label: string };
 const LINKS: NavLink[] = [
@@ -43,13 +44,9 @@ const Navbar: FC = () => {
                             </a>
                         </li>
                     ))}
-                    <li><a
-                        href="#language"
-                        aria-label="Change language"
-                        className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/5 ring-1 ring-white/20 hover:bg-white/10"
-                    >
-                        <Globe className="h-4 w-4 text-white" />
-                    </a></li>
+                    <li>
+                            <LogoutBtn/>
+                        </li>
                 </ul></div>
 
                 {/* Mobile toggle */}
@@ -82,14 +79,7 @@ const Navbar: FC = () => {
                             </li>
                         ))}
                         <li>
-                            <a
-                                href="#language"
-                                className="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-white/5"
-                                onClick={() => setOpen(false)}
-                            >
-                                <Globe className="h-4 w-4" />
-                                Language
-                            </a>
+                            <LogoutBtn/>
                         </li>
                     </ul>
                 </div>

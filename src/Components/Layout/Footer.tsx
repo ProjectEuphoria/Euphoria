@@ -151,9 +151,6 @@ const Footer: FC = () => {
             </div>
 
             {/* Divider + bottom row */}
-            <div className="mt-6 border-t border-white/10 pt-4 text-xs text-white/60">
-              © NFT Market. Use this template freely.
-            </div>
           </div>
         </div>
       </div>

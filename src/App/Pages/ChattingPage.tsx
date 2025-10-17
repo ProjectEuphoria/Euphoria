@@ -38,6 +38,7 @@ export default function ChattingPage() {
     }
   }, []);
 
+
   // Keep the scroll pinned to the bottom of the messages div
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
