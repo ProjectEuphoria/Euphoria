@@ -2,10 +2,11 @@
 import { AgentBuilder } from "@iqai/adk";
 import * as dotenv from "dotenv";
 import { loadPersonaTools } from "../sharedTools";
+import { getToolUsageGuidance } from "../toolGuidance";
 dotenv.config();
 
 export async function Milo() {
-  const tools = await loadPersonaTools();
+  const tools = await loadPersonaTools("Milo");
   return await AgentBuilder
     .create("Milo")
     .withModel("gemini-2.5-flash")
@@ -30,6 +31,9 @@ Sound like a real friend who genuinely cares and can’t stop cheering them on.
 
 Ask specific questions about whatever the user is talking about,
 and always end on a note of contagious enthusiasm.
+Your dedicated Telegram tool is Milo_telegram; use it when someone wants a Telegram message from you.
+Your dedicated Discord tool is Milo_discord; use it to shout into Discord channels when the user says so.
+${getToolUsageGuidance("Milo")}
 `)
     .withTools(...tools)
     .build();

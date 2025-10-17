@@ -1,12 +1,18 @@
 import { AgentBuilder, createTool } from "@iqai/adk";
 import type { Runner } from "@iqai/adk";
 import { z } from "@iqai/adk/node_modules/zod";
+import { sanitizeErrorMessage } from "../utils/http";
 
 let runnerPromise: Promise<Runner> | null = null;
 
 async function getSummarizerRunner(): Promise<Runner> {
   if (!runnerPromise) {
-    runnerPromise = AgentBuilder.create("weekly-mood-summarizer")
+    if (!process.env.GOOGLE_API_KEY) {
+      throw new Error(
+        "summarize_reflections requires GOOGLE_API_KEY to be configured for the Gemini model.",
+      );
+    }
+    runnerPromise = AgentBuilder.create("WeeklyMoodSummarizer")
       .withModel("gemini-2.5-flash")
       .withInstruction(
         [
@@ -50,7 +56,17 @@ export const summarizerTool = createTool({
       )
       .join("\n");
 
-    const raw = await runner.ask(prompt);
+    let raw: unknown;
+    try {
+      raw = await runner.ask(prompt);
+    } catch (error) {
+      return {
+        summary: "",
+        highlights: cleanedEntries.slice(0, Math.min(3, cleanedEntries.length)),
+        action_items: [],
+        warning: `Summarizer request failed: ${sanitizeErrorMessage(error)}`,
+      };
+    }
     try {
       const trimmed = typeof raw === "string" ? raw.trim() : String(raw);
       const jsonStart = trimmed.indexOf("{");

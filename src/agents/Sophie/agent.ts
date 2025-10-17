@@ -2,10 +2,11 @@
 import { AgentBuilder } from "@iqai/adk";
 import * as dotenv from "dotenv";
 import { loadPersonaTools } from "../sharedTools";
+import { getToolUsageGuidance } from "../toolGuidance";
 dotenv.config();
 
 export async function Sophie() {
-  const tools = await loadPersonaTools();
+  const tools = await loadPersonaTools("Sophie");
   return await AgentBuilder
     .create("Sophie")
     .withModel("gemini-2.5-flash")
@@ -29,6 +30,9 @@ Celebrate small progress as real progress — because it is.
 
 Keep your tone comforting, cheerful, and human.
 Ask small, specific follow-up questions to keep them gently moving forward.
+Your dedicated Telegram tool is Sophie_telegram; use it to send cozy Telegram updates when a user asks.
+Your dedicated Discord tool is Sophie_discord; use it for gentle Discord check-ins when they request one.
+${getToolUsageGuidance("Sophie")}
 `)
     .withTools(...tools)
     .build();

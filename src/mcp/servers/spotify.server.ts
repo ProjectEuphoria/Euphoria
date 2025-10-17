@@ -6,11 +6,49 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
+import {
+  fetchWithTimeout,
+  parseJsonBody,
+  sanitizeErrorMessage,
+} from "../utils/http";
 
 const clientId = process.env.SPOTIFY_CLIENT_ID ?? "";
 const clientSecret = process.env.SPOTIFY_CLIENT_SECRET ?? "";
 
 let cachedToken: { accessToken: string; expiresAt: number } | null = null;
+let cachedGenres: string[] | null = null;
+
+const GENRE_SYNONYMS: Record<string, string> = {
+  focus: "focus",
+  study: "study",
+  chill: "chill",
+  relax: "chill",
+  relaxed: "chill",
+  lofi: "lo-fi",
+  lofihiphop: "lo-fi",
+  mellow: "chill",
+  gym: "work-out",
+  workout: "work-out",
+  hype: "dance",
+  sad: "sad",
+  upbeat: "dance",
+  party: "party",
+  anime: "anime",
+  gaming: "gaming",
+  happy: "happy",
+  confident: "confidence",
+  confidentvibes: "confidence",
+  sleep: "sleep",
+  sleepy: "sleep",
+  motivation: "motivation",
+  motivated: "motivation",
+  morning: "morning",
+  evening: "evening",
+  romance: "romance",
+  romantic: "romance",
+  throwback: "road-trip",
+  throwbackvibes: "road-trip",
+};
 
 async function getAccessToken() {
   if (!clientId || !clientSecret) {
@@ -25,20 +63,24 @@ async function getAccessToken() {
   const credentials = Buffer.from(`${clientId}:${clientSecret}`).toString(
     "base64",
   );
-  const response = await fetch("https://accounts.spotify.com/api/token", {
+  const response = await fetchWithTimeout("https://accounts.spotify.com/api/token", {
     method: "POST",
     headers: {
       Authorization: `Basic ${credentials}`,
       "Content-Type": "application/x-www-form-urlencoded",
     },
     body: "grant_type=client_credentials",
+    timeoutMs: 8000,
   });
+  if (response.status === 401) {
+    throw new Error("Spotify rejected the client credentials (401 Unauthorized).");
+  }
   if (!response.ok) {
     throw new Error(
       `Spotify token request failed with status ${response.status}`,
     );
   }
-  const data = await response.json();
+  const data = await parseJsonBody<any>(response, "Spotify token response");
   cachedToken = {
     accessToken: data.access_token,
     expiresAt: now + data.expires_in * 1000,
@@ -115,6 +157,44 @@ server.setRequestHandler(CallToolRequestSchema, async ({ params }) => {
   const token = await getAccessToken();
   const args = (params.arguments ?? {}) as Record<string, unknown>;
 
+  const ensureGenres = async () => {
+    if (cachedGenres) return cachedGenres;
+    try {
+      const res = await fetchWithTimeout(
+        "https://api.spotify.com/v1/recommendations/available-genre-seeds",
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          timeoutMs: 8000,
+        },
+      );
+      if (res.ok) {
+        const data = await parseJsonBody<any>(res, "Spotify genre seeds");
+        cachedGenres = Array.isArray(data.genres) ? data.genres : [];
+      } else {
+        cachedGenres = [];
+      }
+    } catch {
+      cachedGenres = [];
+    }
+    return cachedGenres;
+  };
+
+  const normalize = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+  const resolveSeedGenre = async (input: string) => {
+    const genres = await ensureGenres();
+    const normalizedInput = normalize(input);
+    const synonym = GENRE_SYNONYMS[normalizedInput];
+    if (synonym) return synonym;
+    const exact = genres.find((genre) => normalize(genre) === normalizedInput);
+    if (exact) return exact;
+    const partial = genres.find((genre) =>
+      normalize(genre).includes(normalizedInput) ||
+      normalizedInput.includes(normalize(genre)),
+    );
+    return partial ?? null;
+  };
+
   switch (params.name) {
     case "spotify_vibe_playlists": {
       const mood = typeof args.mood === "string" ? args.mood.trim() : "";
@@ -129,35 +209,77 @@ server.setRequestHandler(CallToolRequestSchema, async ({ params }) => {
       url.searchParams.set("limit", String(limit));
       url.searchParams.set("q", mood);
 
-      const response = await fetch(url, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      if (!response.ok) {
-        throw new Error(
-          `Spotify playlist search failed: ${response.status}`,
-        );
-      }
-      const data = await response.json();
-      const playlists = Array.isArray(data.playlists?.items)
-        ? data.playlists.items.map((pl: any) => ({
-            id: pl.id,
-            name: pl.name,
-            description: pl.description,
-            url: pl.external_urls?.spotify ?? null,
-            owner: pl.owner?.display_name ?? null,
-            followers: pl.followers?.total ?? null,
-          }))
-        : [];
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify({ mood, playlists }, null, 2),
+      try {
+        const response = await fetchWithTimeout(url, {
+          headers: {
+            Authorization: `Bearer ${token}`,
           },
-        ],
-      };
+          timeoutMs: 8000,
+        });
+        if (!response.ok) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify(
+                  {
+                    mood,
+                    warning: `Spotify playlist search failed: ${response.status}`,
+                    playlists: [],
+                  },
+                  null,
+                  2,
+                ),
+              },
+            ],
+          };
+        }
+        const data = await parseJsonBody<any>(response, "Spotify playlist search");
+        const playlists = Array.isArray(data.playlists?.items)
+          ? data.playlists.items.map((pl: any) => ({
+              id: pl.id,
+              name: pl.name,
+              description: pl.description,
+              url: pl.external_urls?.spotify ?? null,
+              owner: pl.owner?.display_name ?? null,
+              followers: pl.followers?.total ?? null,
+            }))
+          : [];
+        const payload = {
+          mood,
+          limit,
+          emptyReason:
+            playlists.length === 0
+              ? "Spotify returned no playlists for this vibe"
+              : undefined,
+          playlists,
+        };
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(payload, null, 2),
+            },
+          ],
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(
+                {
+                  mood,
+                  warning: `Spotify playlist search failed: ${sanitizeErrorMessage(error)}`,
+                  playlists: [],
+                },
+                null,
+                2,
+              ),
+            },
+          ],
+        };
+      }
     }
     case "spotify_track_recs": {
       const seedGenre =
@@ -168,42 +290,88 @@ server.setRequestHandler(CallToolRequestSchema, async ({ params }) => {
       const limitRaw =
         typeof args.limit === "number" ? Math.floor(args.limit) : 5;
       const limit = Math.max(1, Math.min(20, limitRaw));
+      const resolved = await resolveSeedGenre(seedGenre);
+      const usedGenre = resolved ?? "chill";
+      const note = resolved ? undefined : "Requested genre not recognised by Spotify seeds; using 'chill' as a fallback.";
       const url = new URL("https://api.spotify.com/v1/recommendations");
       url.searchParams.set("limit", String(limit));
-      url.searchParams.set("seed_genres", seedGenre.replace(/\s+/g, "-"));
+      url.searchParams.set("seed_genres", usedGenre.replace(/\s+/g, "-"));
 
-      const response = await fetch(url, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      if (!response.ok) {
-        throw new Error(
-          `Spotify recommendations failed: ${response.status}`,
-        );
-      }
-      const data = await response.json();
-      const tracks = Array.isArray(data.tracks)
-        ? data.tracks.map((track: any) => ({
-            id: track.id,
-            name: track.name,
-            artists: track.artists?.map((artist: any) => artist.name) ?? [],
-            previewUrl: track.preview_url,
-            url: track.external_urls?.spotify ?? null,
-          }))
-        : [];
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify(
-              { seedGenre, recommendations: tracks },
-              null,
-              2,
-            ),
+      try {
+        const response = await fetchWithTimeout(url, {
+          headers: {
+            Authorization: `Bearer ${token}`,
           },
-        ],
-      };
+          timeoutMs: 8000,
+        });
+        if (!response.ok) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify(
+                  {
+                    requested: seedGenre,
+                    resolvedGenre: usedGenre,
+                    warning: `Spotify recommendations failed: ${response.status}`,
+                    recommendations: [],
+                    note,
+                  },
+                  null,
+                  2,
+                ),
+              },
+            ],
+          };
+        }
+        const data = await parseJsonBody<any>(response, "Spotify recommendations");
+        const tracks = Array.isArray(data.tracks)
+          ? data.tracks.map((track: any) => ({
+              id: track.id,
+              name: track.name,
+              artists: track.artists?.map((artist: any) => artist.name) ?? [],
+              previewUrl: track.preview_url,
+              url: track.external_urls?.spotify ?? null,
+            }))
+          : [];
+        const payload = {
+          requested: seedGenre,
+          resolvedGenre: usedGenre,
+          note,
+          emptyReason:
+            tracks.length === 0
+              ? "Spotify returned no matches for this vibe"
+              : undefined,
+          recommendations: tracks,
+        };
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(payload, null, 2),
+            },
+          ],
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(
+                {
+                  requested: seedGenre,
+                  resolvedGenre: usedGenre,
+                  warning: `Spotify recommendations failed: ${sanitizeErrorMessage(error)}`,
+                  recommendations: [],
+                  note,
+                },
+                null,
+                2,
+              ),
+            },
+          ],
+        };
+      }
     }
     default:
       throw new Error(`Unknown tool: ${params.name}`);

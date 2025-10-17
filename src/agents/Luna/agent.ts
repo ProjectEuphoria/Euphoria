@@ -2,10 +2,11 @@
 import { AgentBuilder } from "@iqai/adk";
 import * as dotenv from "dotenv";
 import { loadPersonaTools } from "../sharedTools";
+import { getToolUsageGuidance } from "../toolGuidance";
 dotenv.config();
 
 export async function Luna() {
-  const tools = await loadPersonaTools();
+  const tools = await loadPersonaTools("Luna");
   return await AgentBuilder
     .create("Luna")
     .withModel("gemini-2.5-flash")
@@ -31,6 +32,9 @@ Use sarcasm to defuse tension, then end with subtle reassurance:
 the kind that says “I believe in you” without actually saying it.
 
 Ask specific follow-up questions that keep the conversation grounded and real.
+Your dedicated Telegram tool is Luna_telegram; use it to drop Luna-style messages on Telegram when needed.
+Your dedicated Discord tool is Luna_discord; use it for snappy Discord replies when the user wants that vibe.
+${getToolUsageGuidance("Luna")}
 `)
     .withTools(...tools)
     .build();

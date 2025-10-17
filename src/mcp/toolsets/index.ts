@@ -1,4 +1,5 @@
 import type { BaseTool, McpToolset } from "@iqai/adk";
+import { McpIqWiki } from "@iqai/adk";
 import { filesystemToolset, getFilesystemTools } from "./localContext";
 import { webSearchToolset, getWebSearchTools } from "./search";
 import { wikipediaToolset, getWikipediaTools } from "./knowledge";
@@ -9,6 +10,11 @@ import { journalingToolset, getJournalingTools } from "./journal";
 import { trendsToolset, getTrendsTools } from "./trends";
 import { quotesToolset, getQuotesTools } from "./quotes";
 import { getSummarizerTools } from "./summarizer";
+import { getWellnessTools } from "./wellness";
+import { getPersonaTelegramTools } from "./personaTelegram";
+import { getPersonaDiscordTools } from "./personaDiscord";
+
+const iqWikiToolset = McpIqWiki();
 
 export type ToolsetLoader = () => Promise<BaseTool[]>;
 
@@ -18,10 +24,17 @@ export type ToolsetRegistration = {
   toolset?: McpToolset;
 };
 
-export const TOOLSET_REGISTRY: ToolsetRegistration[] = [
+const baseRegistrations: ToolsetRegistration[] = [
   { name: "local-journal-filesystem", loader: getFilesystemTools, toolset: filesystemToolset },
   { name: "search-discovery", loader: getWebSearchTools, toolset: webSearchToolset },
   { name: "knowledge-wikipedia", loader: getWikipediaTools, toolset: wikipediaToolset },
+  {
+    name: "knowledge-iqwiki",
+    loader: async () => {
+      return iqWikiToolset.getTools();
+    },
+    toolset: iqWikiToolset,
+  },
   { name: "visuals-unsplash", loader: getUnsplashTools, toolset: unsplashToolset },
   { name: "music-spotify", loader: getSpotifyTools, toolset: spotifyToolset },
   { name: "emotion-analytics", loader: getEmotionTools, toolset: emotionToolset },
@@ -32,6 +45,21 @@ export const TOOLSET_REGISTRY: ToolsetRegistration[] = [
     name: "ai-summarizer",
     loader: async () => getSummarizerTools(),
   },
+  {
+    name: "wellness-companion",
+    loader: async () => getWellnessTools(),
+  },
 ];
+baseRegistrations.push({
+  name: "telegram-persona",
+  loader: async () => getPersonaTelegramTools(),
+});
+
+baseRegistrations.push({
+  name: "discord-persona",
+  loader: async () => getPersonaDiscordTools(),
+});
+
+export const TOOLSET_REGISTRY: ToolsetRegistration[] = baseRegistrations;
 
 export type { BaseTool } from "@iqai/adk";

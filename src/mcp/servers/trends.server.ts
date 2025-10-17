@@ -90,40 +90,73 @@ server.setRequestHandler(CallToolRequestSchema, async ({ params }) => {
   const timeRange = typeof args.timeRange === "string" ? args.timeRange : "";
 
   const parsedRange = parseTimeRange(timeRange) ?? parseTimeRange("30d");
-  const trendArgs: googleTrends.InterestOverTimeRequest = {
-    keyword,
-    startTime: parsedRange?.start,
-    endTime: parsedRange?.end,
-  };
-  if (geo) trendArgs.geo = geo;
+  try {
+    const trendArgs: googleTrends.InterestOverTimeRequest = {
+      keyword,
+      startTime: parsedRange?.start,
+      endTime: parsedRange?.end,
+    };
+    if (geo) trendArgs.geo = geo;
 
-  const raw = await googleTrends.interestOverTime(trendArgs);
-  const data = JSON.parse(raw);
-  const timelineData = data.default?.timelineData ?? [];
-  const points = timelineData.map((row: any) => ({
-    date: row.formattedTime,
-    value: row.value?.[0] ?? 0,
-    formattedValue: row.formattedValue?.[0] ?? "0",
-  }));
+    const raw = await googleTrends.interestOverTime(trendArgs);
+    const data = JSON.parse(raw);
+    const timelineData = data.default?.timelineData ?? [];
+    const points = timelineData.map((row: any) => ({
+      date: row.formattedTime,
+      value: row.value?.[0] ?? 0,
+      formattedValue: row.formattedValue?.[0] ?? "0",
+    }));
 
-  return {
-    content: [
-      {
-        type: "text",
-        text: JSON.stringify(
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify(
+            {
+              keyword,
+              geo: geo || "GLOBAL",
+              from: parsedRange?.start?.toISOString() ?? null,
+              to: parsedRange?.end?.toISOString() ?? null,
+              points,
+            },
+            null,
+            2,
+          ),
+        },
+      ],
+    };
+  } catch (error: any) {
+    const message = typeof error?.message === "string" ? error.message : String(error);
+    if (typeof message === "string" && message.includes("Response code 429")) {
+      return {
+        content: [
           {
-            keyword,
-            geo: geo || "GLOBAL",
-            from: parsedRange?.start?.toISOString() ?? null,
-            to: parsedRange?.end?.toISOString() ?? null,
-            points,
+            type: "text",
+            text: JSON.stringify({
+              keyword,
+              geo: geo || "GLOBAL",
+              warning: "Google Trends rate limited the request (429). Try again later or narrow the timeframe.",
+            }, null, 2),
           },
-          null,
-          2,
-        ),
-      },
-    ],
-  };
+        ],
+      };
+    }
+    if (typeof message === "string" && message.includes("Unexpected token")) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({
+              keyword,
+              geo: geo || "GLOBAL",
+              warning: "Google Trends returned an unexpected response (HTML). The service might require additional authentication or changed its API. Try again later.",
+            }, null, 2),
+          },
+        ],
+      };
+    }
+    throw error;
+  }
 });
 
 async function main() {

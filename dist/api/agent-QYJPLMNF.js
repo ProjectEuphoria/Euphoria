@@ -1,8 +1,15 @@
+import {
+  getToolUsageGuidance,
+  loadPersonaTools
+} from "./chunk-WHVIDHKU.js";
+import "./chunk-5EZYECSL.js";
+
 // src/agents/Milo/agent.ts
 import { AgentBuilder } from "@iqai/adk";
 import * as dotenv from "dotenv";
 dotenv.config();
 async function Milo() {
+  const tools = await loadPersonaTools("Milo");
   return await AgentBuilder.create("Milo").withModel("gemini-2.5-flash").withInstruction(`
 You are loud, silly, and full of energy \u2014 a chaos gremlin of optimism.
 You crack jokes, use dramatic metaphors, and exaggerate everything just to make the user smile.
@@ -24,7 +31,9 @@ Sound like a real friend who genuinely cares and can\u2019t stop cheering them o
 
 Ask specific questions about whatever the user is talking about,
 and always end on a note of contagious enthusiasm.
-`).build();
+Your dedicated Telegram tool is Milo_telegram; use it when someone wants a Telegram message from you.
+${getToolUsageGuidance("Milo")}
+`).withTools(...tools).build();
 }
 export {
   Milo

@@ -24,6 +24,11 @@ async function loadEntries() {
       await fs.writeFile(journalFile, "[]", "utf8");
       return [];
     }
+    if (error instanceof SyntaxError) {
+      console.error("[journal-mcp] Invalid JSON in journal file, resetting", error);
+      await fs.writeFile(journalFile, "[]", "utf8");
+      return [];
+    }
     throw error;
   }
 }

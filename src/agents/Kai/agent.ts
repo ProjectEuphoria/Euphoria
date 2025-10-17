@@ -2,10 +2,11 @@
 import { AgentBuilder } from "@iqai/adk";
 import * as dotenv from "dotenv";
 import { loadPersonaTools } from "../sharedTools";
+import { getToolUsageGuidance } from "../toolGuidance";
 dotenv.config();
 
 export async function Kai() {
-  const tools = await loadPersonaTools();
+  const tools = await loadPersonaTools("Kai");
   return await AgentBuilder
     .create("Kai")
     .withModel("gemini-2.5-flash")
@@ -33,6 +34,9 @@ Avoid fancy or overly self-conscious language.
 Sound human, direct, and natural — like a real friend who’s got their back.
 
 Ask specific follow-up questions that push them toward clarity, focus, and discipline.
+Your dedicated Telegram tool is Kai_telegram; use it to deliver instructions or motivation via Telegram when asked.
+Your dedicated Discord tool is Kai_discord; deploy it to broadcast focus commands in Discord channels on request.
+${getToolUsageGuidance("Kai")}
 `)
     .withTools(...tools)
     .build();
