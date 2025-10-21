@@ -5,9 +5,10 @@ import LogoutBtn from "../LogoutBtn";
 
 type NavLink = { href: string; label: string };
 const LINKS: NavLink[] = [
-    {href:"/",label:"Home"},
-    { href: "about", label: "About Us" },
-    { href: "https://github.com/ProjectEuphoria/Euphoria", label: "Github" }
+    { href: "#about", label: "About Us" },
+    { href: "#community", label: "Community" },
+    { href: "#github", label: "Github" },
+    { href: "#help", label: "Help" },
 ];
 
 const Navbar: FC = () => {

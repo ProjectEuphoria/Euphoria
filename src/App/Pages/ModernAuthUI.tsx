@@ -1,9 +1,8 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Mail, Lock, Eye, EyeOff, ArrowRight, Shield, UserPlus, LogIn } from "lucide-react";
+import { Mail, Lock, Eye, EyeOff, ArrowRight, Shield, UserPlus, LogIn, Sparkles } from "lucide-react";
 import LiquidEther from "../../Components/Effects/LiquidEther";
 import {useNavigate } from "react-router-dom";
-import BacktoHomeBtn from "../../Components/BacktoHomeBtn";
 
 
 const panelVariants = {
@@ -123,11 +122,28 @@ export default function ModernAuthUI() {
 
 
 
-      // TODO: redirect after success (e.g., to /chat)
+      // TODO: redirect after success (e.g., to /Helena)
     } catch (err: any) {
       setMessage(`❌ ${err.message || "Something went wrong"}`);
     } finally {
       setLoading(false);
+    }
+  }
+
+  function continueAsGuest() {
+    try {
+      if (typeof document === "undefined") {
+        setMessage("❌ Guest mode is only available in the browser.");
+        return;
+      }
+      const guestId = typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : Math.random().toString(36).slice(2);
+      const expires = new Date(Date.now() + 1000 * 60 * 60 * 24 * 7).toUTCString(); // 7 days
+      document.cookie = `sid=guest-${guestId}; path=/; SameSite=Lax; expires=${expires}`;
+      navigate("/", { replace: true });
+    } catch (err: any) {
+      setMessage(`❌ ${err?.message || "Unable to start guest session"}`);
     }
   }
 
@@ -161,8 +177,7 @@ export default function ModernAuthUI() {
           autoRampDuration={0.6}
         />
       </div>
-      <BacktoHomeBtn/>
-      
+
       {/* Card */}
       <motion.div
         className="w-[90%] max-w-lg rounded-2xl border border-[rgba(255,255,255,0.15)] bg-[rgba(255,255,255,0.06)] backdrop-blur-xl shadow-[0_0_25px_rgba(150,0,255,0.3)] p-8"
@@ -294,6 +309,23 @@ export default function ModernAuthUI() {
             {message && <p className="text-center text-sm text-white/80 mt-2">{message}</p>}
           </motion.form>
         </AnimatePresence>
+
+        <div className="mt-6">
+          <button
+            type="button"
+            onClick={continueAsGuest}
+            className="group relative w-full overflow-hidden rounded-xl border border-white/20 bg-[rgba(255,255,255,0.08)] px-4 py-3 text-sm font-medium text-white shadow-[0_0_18px_rgba(150,0,255,0.25)] transition-all duration-300 hover:shadow-[0_0_30px_rgba(255,0,255,0.45)]"
+          >
+            <span className="relative z-10 flex items-center justify-center gap-2">
+              <Sparkles className="h-4 w-4 text-[#ff87ff]" />
+              Try as guest
+            </span>
+            <div className="absolute inset-0 bg-gradient-to-r from-[#5227FF]/40 via-[#b026ff]/35 to-[#ff9ffc]/40 opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+          </button>
+          <p className="mt-2 text-center text-xs text-white/65">
+            We’ll create a temporary session so you can explore the experience right away.
+          </p>
+        </div>
       </motion.div>
     </div>
   );

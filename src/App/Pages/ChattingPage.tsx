@@ -1,23 +1,106 @@
 // src/Pages/ChattingPage.tsx
 import { useEffect, useRef, useState } from "react";
-import { useParams, useSearchParams } from "react-router-dom";
-import BacktoHomeBtn from "../../Components/BacktoHomeBtn";
+import { Navigate, useNavigate, useParams } from "react-router-dom";
+import { ArrowLeft, ChevronLeft, ChevronRight, Sparkles, Volume2, VolumeX } from "lucide-react";
+import { buildChatUrl } from "../../utils/url";
+import helenaImg from "../../assets/give a good anime background which is subjected to no copyright.jpg";
+import miloImg from "../../assets/Milo_bg.jpg";
+import sophieImg from "../../assets/Sophie_bg.jpg";
+import kaiImg from "../../assets/Kai_bg.jpg";
+import lunaImg from "../../assets/Luna_bg.jpg";
 
 type AskResponse = { reply?: string; error?: string };
 
+const PERSONA_BACKGROUNDS: Record<string, string> = {
+  helena: helenaImg,
+  milo: miloImg,
+  kai: kaiImg,
+  sophie: sophieImg,
+  luna: lunaImg,
+};
+
+const PERSONA_DETAILS: Record<string, { accent: string; glow: string; tagline: string }> = {
+  helena: {
+    accent: "rgba(255, 159, 252, 0.32)",
+    glow: "rgba(82, 39, 255, 0.5)",
+    tagline: "Calm clarity with timeless wisdom.",
+  },
+  milo: {
+    accent: "rgba(82, 39, 255, 0.32)",
+    glow: "rgba(255, 61, 230, 0.5)",
+    tagline: "Energetic insight with playful warmth.",
+  },
+  kai: {
+    accent: "rgba(101, 235, 255, 0.32)",
+    glow: "rgba(82, 39, 255, 0.5)",
+    tagline: "Adventurous spirit with steady focus.",
+  },
+  sophie: {
+    accent: "rgba(255, 201, 125, 0.32)",
+    glow: "rgba(176, 38, 255, 0.45)",
+    tagline: "Empathetic muse with creative spark.",
+  },
+  luna: {
+    accent: "rgba(166, 125, 255, 0.32)",
+    glow: "rgba(255, 61, 230, 0.45)",
+    tagline: "Soft starlight with gentle guidance.",
+  },
+};
+
+// Browsers expose different voice names; update these per deployment.
+// When none of the preferred voices are available, we fall back to the first voice.
+const PERSONA_VOICE_MAP: Record<
+  string,
+  {
+    names: string[];
+    rate: number;
+    pitch: number;
+  }
+> = {
+  helena: {
+    names: ["Google en-GB-Wavenet-A", "Google UK English Female", "Google UK English"],
+    rate: 0.94,
+    pitch: 1.12,
+  },
+  milo: {
+    names: ["Google en-US-Wavenet-B", "Google US English Male", "Google US English"],
+    rate: 1.12,
+    pitch: 1.12,
+  },
+  kai: {
+    names: ["Google en-US-Wavenet-D", "Google UK English Male", "Google US English Male"],
+    rate: 0.97,
+    pitch: 0.95,
+  },
+  sophie: {
+    names: ["Google en-US-Wavenet-F", "Google US English Female", "Google US English"],
+    rate: 1.12,
+    pitch: 1.32,
+  },
+  luna: {
+    names: ["Google en-US-Wavenet-G", "Google US English Female", "Google UK English Female"],
+    rate: 1.07,
+    pitch: 1.28,
+  },
+};
+
 export default function ChattingPage() {
   const { name = "" } = useParams<{ name: string }>();
-  const [sp] = useSearchParams();
-  const bgImg = sp.get("bg") ?? sp.get("image") ?? undefined;
+  const navigate = useNavigate();
 
   const [input, setInput] = useState("");
   const [userLocked, setUserLocked] = useState<string>("");
   const [aiReply, setAiReply] = useState<string>("");
   const [sending, setSending] = useState(false);
+  const [panelOpen, setPanelOpen] = useState(false);
+  const [muted, setMuted] = useState(false);
 
   const recognitionRef = useRef<any>(null);
   const controllerRef = useRef<AbortController | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
+  const voicesRef = useRef<SpeechSynthesisVoice[]>([]);
+  const pendingSpeechRef = useRef<string>("");
+  const lastSynthTextRef = useRef<string>("");
 
   // Optional voice input
   useEffect(() => {
@@ -39,11 +122,146 @@ export default function ChattingPage() {
     }
   }, []);
 
+  useEffect(() => {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+    const synth = window.speechSynthesis;
+
+    const loadVoices = () => {
+      const available = synth.getVoices();
+      if (available.length) {
+        voicesRef.current = available;
+      }
+    };
+
+    loadVoices();
+    const canUseEvents = typeof synth.addEventListener === "function";
+    let previousHandler: (typeof synth)["onvoiceschanged"] | undefined;
+
+    if (canUseEvents) {
+      synth.addEventListener("voiceschanged", loadVoices);
+    } else {
+      previousHandler = synth.onvoiceschanged;
+      synth.onvoiceschanged = (event: Event) => {
+        loadVoices();
+        previousHandler?.call(synth, event);
+      };
+    }
+
+    return () => {
+      if (canUseEvents) {
+        synth.removeEventListener?.("voiceschanged", loadVoices);
+      } else if (previousHandler !== undefined) {
+        synth.onvoiceschanged = previousHandler ?? null;
+      }
+    };
+  }, []);
+
+  function speakWithPersona(text: string, personaKey: string) {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+    const synth = window.speechSynthesis;
+    const voices = synth.getVoices();
+    if (voices.length) {
+      voicesRef.current = voices;
+    }
+
+    const lower = personaKey.toLowerCase();
+    const personaVoice = PERSONA_VOICE_MAP[lower];
+
+    if (!voicesRef.current.length) {
+      pendingSpeechRef.current = text;
+      synth.cancel();
+      return;
+    }
+
+    let selectedVoice: SpeechSynthesisVoice | undefined;
+    if (personaVoice) {
+      const preferredNames = personaVoice.names.map((value) => value.toLowerCase());
+      selectedVoice = voicesRef.current.find((voice) =>
+        preferredNames.includes(voice.name.toLowerCase()),
+      );
+    }
+
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.voice = selectedVoice ?? voicesRef.current[0];
+    utterance.rate = personaVoice?.rate ?? 1;
+    utterance.pitch = personaVoice?.pitch ?? 1;
+
+    synth.cancel();
+    synth.speak(utterance);
+    lastSynthTextRef.current = text;
+  }
+
 
   // Keep the scroll pinned to the bottom of the messages div
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [userLocked, aiReply]);
+
+  useEffect(() => {
+    setPanelOpen(false);
+    controllerRef.current?.abort();
+    setSending(false);
+    setUserLocked("");
+    setAiReply("");
+    setInput("");
+    pendingSpeechRef.current = "";
+    lastSynthTextRef.current = "";
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+    }
+  }, [name]);
+
+  useEffect(() => {
+    return () => {
+      if (typeof window !== "undefined" && "speechSynthesis" in window) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, []);
+
+  const allBots = ["Helena", "Milo", "Kai", "Sophie", "Luna"] as const;
+  const normalizedName = name.toLowerCase();
+  const isKnownPersona = allBots.some((bot) => bot.toLowerCase() === normalizedName);
+  const otherBots = allBots.filter((bot) => bot.toLowerCase() !== normalizedName);
+  const bgImg = PERSONA_BACKGROUNDS[normalizedName];
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+    const trimmed = aiReply.trim();
+    const synth = window.speechSynthesis;
+
+    if (!trimmed || trimmed === "…" || trimmed.startsWith("⚠️") || !isKnownPersona) {
+      pendingSpeechRef.current = "";
+      lastSynthTextRef.current = "";
+      synth.cancel();
+      return;
+    }
+
+    pendingSpeechRef.current = trimmed;
+    if (muted) return;
+    if (trimmed === lastSynthTextRef.current) return;
+
+    speakWithPersona(trimmed, normalizedName);
+  }, [aiReply, muted, normalizedName, isKnownPersona]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+    if (muted) {
+      window.speechSynthesis.cancel();
+      return;
+    }
+    const pending = pendingSpeechRef.current;
+    if (!pending || pending === lastSynthTextRef.current || !isKnownPersona) return;
+    speakWithPersona(pending, normalizedName);
+  }, [muted, normalizedName, isKnownPersona]);
+
+  if (name && !isKnownPersona) {
+    return <Navigate to="/" replace />;
+  }
+
+  function togglePanel() {
+    setPanelOpen((v) => !v);
+  }
 
   function startVoice() {
     if (!recognitionRef.current) {
@@ -101,6 +319,11 @@ export default function ChattingPage() {
     setUserLocked("");
     setAiReply("");
     setInput("");
+    pendingSpeechRef.current = "";
+    lastSynthTextRef.current = "";
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+    }
   }
 
   return (
@@ -108,18 +331,111 @@ export default function ChattingPage() {
       className="min-h-screen w-full relative"
       style={bgImg ? { backgroundImage: `url(${bgImg})`, backgroundSize: "cover", backgroundPosition: "center" } : undefined}
     >
-      
+      <aside
+        className={`fixed inset-y-0 left-0 z-30 w-[19rem] sm:w-[20.5rem] px-5 py-0 transition-transform duration-500 ease-[cubic-bezier(0.22,0.61,0.36,1)] ${panelOpen ? "translate-x-0" : "-translate-x-[calc(100%+2.5rem)]"}`}
+        aria-hidden={!panelOpen}
+      >
+        <div className="relative flex h-full flex-col overflow-hidden rounded-r-[3.25rem] border border-white/12 bg-white/6 bg-clip-padding backdrop-blur-[34px] shadow-[0_0_50px_rgba(82,39,255,0.36)]">
+          <div className="absolute inset-0 pointer-events-none">
+            <div className="absolute inset-0 bg-gradient-to-br from-[#5227FF]/30 via-[#b026ff]/18 to-transparent opacity-95" />
+            <div className="absolute -left-16 top-1/5 h-40 w-40 rounded-full bg-[#ff9ffc]/40 blur-[90px]" />
+            <div className="absolute right-[-3rem] bottom-20 h-36 w-36 rounded-full bg-[#6f35ff]/45 blur-[80px]" />
+            <div className="absolute left-1/2 top-1/2 h-[420px] w-[420px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-gradient-to-br from-[#ff9ffc]/12 via-transparent to-transparent blur-[140px]" />
+          </div>
+          <div className="relative flex flex-col gap-4 px-7 pt-10 pb-6">
+            <p className="flex items-center gap-2 text-[11px] uppercase tracking-[0.4em] text-white/65">
+              <Sparkles className="h-3 w-3" /> Currently with
+            </p>
+            <h2 className="text-3xl font-semibold text-white drop-shadow-[0_4px_20px_rgba(176,38,255,0.6)]">
+              {name || "AI"}
+            </h2>
+            <p className="text-xs leading-relaxed text-white/70">
+              Tap anyone below to swap personas on the fly.
+            </p>
+          </div>
+          <nav className="relative flex-1 space-y-4 px-7 pb-8 overflow-y-auto no-scrollbar">
+            {otherBots.map((bot) => {
+              const lower = bot.toLowerCase();
+              const detail = PERSONA_DETAILS[lower] ?? PERSONA_DETAILS.helena;
+              return (
+                <button
+                  key={bot}
+                  type="button"
+                  onClick={() => {
+                    navigate(buildChatUrl(bot));
+                    setPanelOpen(false);
+                  }}
+                  className="group relative w-full overflow-hidden rounded-[1.7rem] border border-white/18 bg-white/16 px-6 py-2.5 text-left text-sm font-semibold text-white/90 shadow-[0_18px_40px_-18px_rgba(82,39,255,0.45)] transition-colors duration-500 hover:border-white/35 hover:bg-white/22 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#b026ff]/70"
+                >
+                  <div
+                    className="absolute inset-0 opacity-50 transition-opacity duration-500 group-hover:opacity-80"
+                    style={{ background: `linear-gradient(135deg, ${detail.accent} 0%, rgba(255,255,255,0.04) 60%, transparent 100%)` }}
+                  />
+                  <div
+                    className="absolute -right-12 top-1/2 h-28 w-28 -translate-y-1/2 rounded-full blur-3xl opacity-60 transition-opacity duration-500 group-hover:opacity-90"
+                    style={{ background: detail.glow }}
+                  />
+                  <div className="relative flex flex-col gap-1.5">
+                    <span className="flex items-center justify-between">
+                      <span className="text-base font-semibold">{bot}</span>
+                      <span className="opacity-0 text-[10px] uppercase tracking-[0.35em] text-white/80 transition-opacity duration-500 group-hover:opacity-100">
+                        Switch
+                      </span>
+                    </span>
+                    <span className="text-xs font-normal text-white/70">
+                      {detail.tagline}
+                    </span>
+                  </div>
+                </button>
+              );
+            })}
+          </nav>
+          <div className="relative px-7 pb-10 pt-6">
+            <div className="rounded-2xl border border-white/18 bg-white/12 p-[1px] shadow-[0_12px_28px_-18px_rgba(255,159,252,0.6)]">
+              <button
+                type="button"
+                onClick={() => navigate("/")}
+                className="flex w-full items-center justify-center gap-2 rounded-[1.1rem] bg-gradient-to-br from-black/55 via-black/35 to-black/55 px-6 py-3.5 text-sm font-medium text-white/85 transition hover:brightness-125 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#ff9ffc]/70"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Back to home
+              </button>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <button
+        type="button"
+        onClick={togglePanel}
+        className={`fixed top-1/2 left-0 z-40 flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-r-2xl border border-white/25 bg-gradient-to-br from-[#5227FF]/75 via-[#b026ff]/65 to-[#ff9ffc]/65 text-white backdrop-blur-2xl shadow-[0_0_34px_rgba(176,38,255,0.62)] transition-transform duration-500 ease-[cubic-bezier(0.22,0.61,0.36,1)] hover:scale-[1.05] ${panelOpen ? "translate-x-[20.5rem]" : "-translate-x-3"}`}
+        aria-label={panelOpen ? "Hide persona panel" : "Show persona panel"}
+        aria-expanded={panelOpen}
+      >
+        {panelOpen ? <ChevronLeft className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
+      </button>
+
       {/* legibility overlay */}
       <div className="absolute inset-0 bg-black/30" />
-      <div className="ml-10">
-      <BacktoHomeBtn/>
-      </div>
+
       {/* Centered header */}
       <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10">
         <div className="px-5 py-2 rounded-2xl border border-white/20 bg-black/45 backdrop-blur-xl text-white shadow-lg">
           <span className="opacity-80">Chatting with</span>{" "}
           <span className="font-semibold">“{name || "AI"}”</span>
         </div>
+      </div>
+      <div className="absolute top-4 right-4 z-10 flex flex-col items-end gap-2">
+        <button
+          type="button"
+          onClick={() => setMuted((prev) => !prev)}
+          className="flex items-center gap-2 rounded-2xl border border-white/25 bg-black/45 px-4 py-2 text-xs font-medium uppercase tracking-[0.2em] text-white/80 backdrop-blur-xl shadow-lg transition hover:bg-white/10"
+          aria-pressed={!muted}
+          aria-label={muted ? "Unmute voice playback" : "Mute voice playback"}
+        >
+          {muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+          <span>{muted ? "Unmute voice" : "Mute voice"}</span>
+        </button>
       </div>
 
       {/* ===== Messages Area (only this scrolls) ===== */}

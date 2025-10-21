@@ -5,11 +5,6 @@ import LiquidEther from "../../Components/Effects/LiquidEther";
 import CharacterCard from "../../Components/Cards/CharacterCard";
 import SectionHeading from "../../Components/SectionHeading";
 import heroImage from "../../assets/9006.jpg_wh860.jpg";
-import helenaImg from "../../assets/give a good anime background which is subjected to no copyright.jpg"
-import miloImg from "../../assets/Milo_bg.jpg"
-import sophieImg from "../../assets/Sophie_bg.jpg"
-import kaiImg from "../../assets/Kai_bg.jpg"
-import lunaImg from "../../assets/Luna_bg.jpg"
 import { useNavigate } from "react-router-dom";
 import { buildChatUrl } from "../../utils/url";
 
@@ -63,7 +58,6 @@ const LandingPage: FC = () => {
           autoRampDuration={0.6}
         />
       </div>
-      
       <Navbar />
 
       <main>
@@ -71,11 +65,11 @@ const LandingPage: FC = () => {
         <Hero />
         <SectionHeading>Choose your Character</SectionHeading>
         <div className="flex max-w-7xl flex-wrap mx-auto  justify-center" style={{ rowGap: "50px", columnGap: "100px", marginTop: "70px" }}>
-          <CharacterCard name="Helena" description="She is good" imageSrc={heroImage} onClick={() => { navigate(buildChatUrl("Helena", helenaImg)) }}></CharacterCard>
-          <CharacterCard name="Milo" description="He is good " imageSrc={heroImage} onClick={() => { navigate(buildChatUrl("Milo", miloImg)) }}></CharacterCard>
-          <CharacterCard name="Kai" description="She is good " imageSrc={heroImage} onClick={() => { navigate(buildChatUrl("Kai", kaiImg)) }} ></CharacterCard>
-          <CharacterCard name="Sophie" description="She is good " imageSrc={heroImage} onClick={() => { navigate(buildChatUrl("Sophie", sophieImg)) }} ></CharacterCard>
-          <CharacterCard name="Luna" description="She is good " imageSrc={heroImage} onClick={() => { navigate(buildChatUrl("Luna", lunaImg)) }} ></CharacterCard>
+          <CharacterCard name="Helena" description="She is good" imageSrc={heroImage} onClick={() => { navigate(buildChatUrl("Helena")) }}></CharacterCard>
+          <CharacterCard name="Milo" description="He is good " imageSrc={heroImage} onClick={() => { navigate(buildChatUrl("Milo")) }}></CharacterCard>
+          <CharacterCard name="Kai" description="She is good " imageSrc={heroImage} onClick={() => { navigate(buildChatUrl("Kai")) }} ></CharacterCard>
+          <CharacterCard name="Sophie" description="She is good " imageSrc={heroImage} onClick={() => { navigate(buildChatUrl("Sophie")) }} ></CharacterCard>
+          <CharacterCard name="Luna" description="She is good " imageSrc={heroImage} onClick={() => { navigate(buildChatUrl("Luna")) }} ></CharacterCard>
         </div>
 
       </main>

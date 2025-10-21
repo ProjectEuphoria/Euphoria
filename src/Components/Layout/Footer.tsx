@@ -1,17 +1,6 @@
 import { type FC, useState } from "react";
 import { Github, Twitter, Instagram, Linkedin,ArrowRight } from "lucide-react";
 import Logo from "../Brand/Logo";
-import { Link } from "react-router-dom";
-import helenaImg from "../../assets/give a good anime background which is subjected to no copyright.jpg";
-import kaiImg from "../../assets/Kai_bg.jpg";
-import lunaImg from "../../assets/Luna_bg.jpg";
-import sophieImg from "../../assets/Sophie_bg.jpg";
-import miloImg from "../../assets/Milo_bg.jpg";
-import { buildChatUrl } from "../../utils/url";
-import WeeklyDigest from "../WeeklyDigest";
-
-
-
 
 const Footer: FC = () => {
   const [email, setEmail] = useState("");
@@ -21,8 +10,6 @@ const Footer: FC = () => {
     // TODO: hook up your subscribe API
     console.log("subscribe:", email);
   };
-
-
 
   return (
     <footer className="mt-16">
@@ -72,7 +59,7 @@ const Footer: FC = () => {
                     <Instagram className="h-4 w-4" />
                   </a>
                   <a
-                    href="https://github.com/ProjectEuphoria/Euphoria"
+                    href="#"
                     aria-label="Github"
                     className="grid h-9 w-9 place-items-center rounded-full bg-white/5 ring-1 ring-white/10 text-white/80 hover:bg-white/10"
                   >
@@ -98,36 +85,69 @@ const Footer: FC = () => {
                  
                 </span>
                 <ul className="mt-4 grid gap-2 text-sm text-white/80 ml-3 ">
-                  <Link className="w-fit" to={buildChatUrl("Helena",helenaImg)}>
-                    <a href="" className="hover:text-white ">
-                      Helena
+                  <li>
+                    <a href="#" className="hover:text-white">
+                      ChatBot 1
                     </a>
-                  </Link>
-                  <Link className="w-fit" to={buildChatUrl("Milo",miloImg)}>
-                    <a href="" className="hover:text-white ">
-                      Milo
+                  </li>
+                  <li>
+                    <a href="#" className="hover:text-white">
+                      ChatBot 2
                     </a>
-                  </Link>
-                  <Link className="w-fit" to={buildChatUrl("Kai",kaiImg)}>
-                    <a href="" className="hover:text-white  ">
-                      Kai
+                  </li>
+                  <li>
+                    <a href="#" className="hover:text-white">
+                      ChatBot 3
                     </a>
-                  </Link>
-                  <Link className="w-fit" to={buildChatUrl("Sophie",sophieImg)}>
-                    <a href="" className="hover:text-white ">
-                      Sophie
+                  </li>
+                  <li>
+                    <a href="#" className="hover:text-white">
+                      ChatBot 4
                     </a>
-                  </Link>
-                  <Link className="w-fit" to={buildChatUrl("Luna",lunaImg)}>
-                    <a href="" className="hover:text-white ">
-                      Luna
+                  </li>
+                  <li>
+                    <a href="#" className="hover:text-white">
+                      ChatBot 5
                     </a>
-                  </Link>
+                  </li>
                 </ul>
               </div>
 
               {/* Col 3: Weekly Digest */}
-              <WeeklyDigest/>
+              <div className="mt-10">
+                <h4 className="text-sm font-semibold tracking-wide text-white">
+                  Join Our Weekly Digest
+                </h4>
+                <p className="mt-4 text-sm text-white/70 max-w-sm">
+                  Get exclusive promotions & updates straight to your inbox.
+                </p>
+
+                <form onSubmit={onSubmit} className="mt-4 flex gap-3 max-w-sm">
+                  <input
+                    type="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="Enter your email here"
+                    className="
+                      w-full rounded-xl border border-white/15 bg-white/5
+                      px-3 py-2 text-sm text-white placeholder-white/50
+                      outline-none ring-0 focus:border-white/30
+                    "
+                  />
+                  <button
+                    type="submit"
+                    className="
+                      whitespace-nowrap rounded-xl px-4 py-2 text-sm font-semibold
+                      text-white shadow
+                      bg-gradient-to-r from-fuchsia-600 to-violet-600
+                      hover:from-fuchsia-500 hover:to-violet-500
+                    "
+                  >
+                    Subscribe
+                  </button>
+                </form>
+              </div>
             </div>
 
             {/* Divider + bottom row */}
