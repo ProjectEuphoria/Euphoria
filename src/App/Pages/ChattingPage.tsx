@@ -1,6 +1,7 @@
 // src/Pages/ChattingPage.tsx
 import { useEffect, useRef, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
+import BacktoHomeBtn from "../../Components/BacktoHomeBtn";
 
 type AskResponse = { reply?: string; error?: string };
 
@@ -107,9 +108,12 @@ export default function ChattingPage() {
       className="min-h-screen w-full relative"
       style={bgImg ? { backgroundImage: `url(${bgImg})`, backgroundSize: "cover", backgroundPosition: "center" } : undefined}
     >
+      
       {/* legibility overlay */}
       <div className="absolute inset-0 bg-black/30" />
-
+      <div className="ml-10">
+      <BacktoHomeBtn/>
+      </div>
       {/* Centered header */}
       <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10">
         <div className="px-5 py-2 rounded-2xl border border-white/20 bg-black/45 backdrop-blur-xl text-white shadow-lg">

@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Mail, Lock, Eye, EyeOff, ArrowRight, Shield, UserPlus, LogIn } from "lucide-react";
 import LiquidEther from "../../Components/Effects/LiquidEther";
 import {useNavigate } from "react-router-dom";
+import BacktoHomeBtn from "../../Components/BacktoHomeBtn";
 
 
 const panelVariants = {
@@ -160,7 +161,8 @@ export default function ModernAuthUI() {
           autoRampDuration={0.6}
         />
       </div>
-
+      <BacktoHomeBtn/>
+      
       {/* Card */}
       <motion.div
         className="w-[90%] max-w-lg rounded-2xl border border-[rgba(255,255,255,0.15)] bg-[rgba(255,255,255,0.06)] backdrop-blur-xl shadow-[0_0_25px_rgba(150,0,255,0.3)] p-8"

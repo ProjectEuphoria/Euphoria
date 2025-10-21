@@ -63,6 +63,7 @@ const LandingPage: FC = () => {
           autoRampDuration={0.6}
         />
       </div>
+      
       <Navbar />
 
       <main>

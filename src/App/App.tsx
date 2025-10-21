@@ -5,6 +5,7 @@ import LandingPage from './Pages/LandingPage'
 import ChattingPage from './Pages/ChattingPage'
 import ModernAuthUI from './Pages/ModernAuthUI'
 import ProtectedRoute from '../Components/ProtectedRoute'
+import About from './Pages/About'
 function App() {
 
   return (
@@ -12,6 +13,7 @@ function App() {
       {/* public */}
       <Route path="/" element={<LandingPage />} />
       <Route path="/auth" element={<ModernAuthUI />} />
+      <Route path='/about' element={<About />} />
 
       {/* protected */}
       <Route element={<ProtectedRoute />}>
