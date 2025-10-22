@@ -29,7 +29,7 @@ const CharacterCard: FC<CharacterCardProps> = ({
         focus:outline-none focus-visible:ring-2 focus-visible:ring-ring
         text-left
       "
-      style={{ width: "270px", height: "40vh" }}
+      style={{ width: "270px", height: "60vh" }}
     >
       {/* Image */}
       <div className="aspect-[4/5] w-full h-full overflow-hidden">

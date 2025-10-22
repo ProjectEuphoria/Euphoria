@@ -59,7 +59,7 @@ const Footer: FC = () => {
                     <Instagram className="h-4 w-4" />
                   </a>
                   <a
-                    href="#"
+                    href="https://github.com/ProjectEuphoria/Euphoria"
                     aria-label="Github"
                     className="grid h-9 w-9 place-items-center rounded-full bg-white/5 ring-1 ring-white/10 text-white/80 hover:bg-white/10"
                   >
