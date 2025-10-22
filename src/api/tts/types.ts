@@ -76,6 +76,14 @@ export interface TtsRequestBody {
   seed?: number;
 }
 
+export interface SpeechMark {
+  time: number;
+  type: string;
+  value: string;
+  start?: number;
+  end?: number;
+}
+
 export interface TtsResponseMeta {
   persona: PersonaKey;
   baseVoice: string;
@@ -101,4 +109,5 @@ export interface TtsResponseMeta {
     hit: boolean;
     expiresAt: number;
   };
+  speechMarks?: SpeechMark[];
 }

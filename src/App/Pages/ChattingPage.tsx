@@ -11,6 +11,14 @@ import lunaImg from "../../assets/Luna_bg.jpg";
 
 type AskResponse = { reply?: string; error?: string };
 
+type SpeechMark = {
+  time: number;
+  value: string;
+  type: string;
+  start?: number;
+  end?: number;
+};
+
 const PERSONA_BACKGROUNDS: Record<string, string> = {
   helena: helenaImg,
   milo: miloImg,
@@ -47,6 +55,8 @@ const PERSONA_DETAILS: Record<string, { accent: string; glow: string; tagline: s
   },
 };
 
+const SPEECH_LEAD_MS = 80;
+
 function base64ToBlob(base64: string, contentType: string) {
   const byteCharacters = atob(base64);
   const byteNumbers = new Array(byteCharacters.length);
@@ -55,6 +65,14 @@ function base64ToBlob(base64: string, contentType: string) {
   }
   const byteArray = new Uint8Array(byteNumbers);
   return new Blob([byteArray], { type: contentType });
+}
+
+function sanitizeForSpeech(text: string): string {
+  return text
+    .replace(/\p{Extended_Pictographic}/gu, "")
+    .replace(/[\uFE0F\u200D]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 export default function ChattingPage() {
@@ -67,6 +85,9 @@ export default function ChattingPage() {
   const [sending, setSending] = useState(false);
   const [panelOpen, setPanelOpen] = useState(false);
   const [muted, setMuted] = useState(false);
+  const [speechMarks, setSpeechMarks] = useState<SpeechMark[]>([]);
+  const [ttsPending, setTtsPending] = useState(false);
+  const [streaming, setStreaming] = useState(false);
 
   const recognitionRef = useRef<any>(null);
   const controllerRef = useRef<AbortController | null>(null);
@@ -76,6 +97,7 @@ export default function ChattingPage() {
   const ttsAbortRef = useRef<AbortController | null>(null);
   const mutedRef = useRef(muted);
   const [renderedReply, setRenderedReply] = useState("");
+  const animationFrameRef = useRef<number | null>(null);
 
   // Optional voice input
   useEffect(() => {
@@ -116,11 +138,7 @@ export default function ChattingPage() {
   useEffect(() => {
     if (!audioRef.current) return;
     audioRef.current.muted = muted;
-    if (muted) {
-      audioRef.current.pause();
-      return;
-    }
-    if (audioRef.current.src) {
+    if (!muted && audioRef.current.src) {
       void audioRef.current
         .play()
         .catch(() => {
@@ -147,6 +165,10 @@ export default function ChattingPage() {
     setAiReply("");
     setInput("");
     stopAudio();
+    setSpeechMarks([]);
+    setRenderedReply("");
+    setStreaming(false);
+    setTtsPending(false);
   }, [name]);
 
   useEffect(() => {
@@ -163,7 +185,7 @@ export default function ChattingPage() {
   const otherBots = allBots.filter((bot) => bot.toLowerCase() !== normalizedName);
   const bgImg = PERSONA_BACKGROUNDS[normalizedName];
   const canonicalPersona = allBots.find((bot) => bot.toLowerCase() === normalizedName) ?? allBots[0];
-  const isLoadingReply = sending && aiReply === "…";
+  const isLoadingReply = ttsPending || (sending && aiReply === "…");
 
   const stopAudio = () => {
     if (audioRef.current) {
@@ -174,43 +196,185 @@ export default function ChattingPage() {
       URL.revokeObjectURL(audioUrlRef.current);
       audioUrlRef.current = "";
     }
+    if (animationFrameRef.current !== null) {
+      window.cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
   };
 
   useEffect(() => {
     if (!aiReply || aiReply === "…" || aiReply.startsWith("⚠️")) {
+      setStreaming(false);
       setRenderedReply(aiReply);
       return;
     }
 
-    const tokens = aiReply.split(/(\s+)/);
-    if (tokens.length === 0) {
+    const audio = audioRef.current;
+    if (!audio || ttsPending || !speechMarks.length) {
+      setStreaming(false);
       setRenderedReply(aiReply);
       return;
     }
 
-    let index = 0;
-    setRenderedReply(tokens[index] ?? "");
-    index += 1;
+    const marks = speechMarks
+      .filter((mark) => mark.type === "word" && typeof mark.value === "string" && mark.value.trim().length)
+      .sort((a, b) => a.time - b.time);
 
-    if (index >= tokens.length) return;
+    if (!marks.length) {
+      setStreaming(false);
+      setRenderedReply(aiReply);
+      return;
+    }
 
-    const intervalId = window.setInterval(() => {
-      setRenderedReply((prev) => prev + (tokens[index] ?? ""));
-      index += 1;
-      if (index >= tokens.length) {
-        window.clearInterval(intervalId);
+    const original = aiReply;
+    const lowerOriginal = original.toLowerCase();
+    let searchIndex = 0;
+    const chunkEvents: Array<{ time: number; chunk: string }> = [];
+
+    marks.forEach((mark) => {
+      const normalized = mark.value.trim();
+      if (!normalized) return;
+
+      const lowerValue = normalized.toLowerCase();
+      let start = lowerOriginal.indexOf(lowerValue, searchIndex);
+      if (start === -1) {
+        start = searchIndex;
       }
-    }, 90);
+
+      if (start < searchIndex) {
+        start = searchIndex;
+      }
+
+      const end = Math.min(original.length, start + normalized.length);
+
+      if (start > searchIndex) {
+        const filler = original.slice(searchIndex, start);
+        if (filler) {
+          chunkEvents.push({ time: Math.max(0, mark.time - 1), chunk: filler });
+        }
+      }
+
+      const chunk = original.slice(start, end);
+      if (chunk) {
+        chunkEvents.push({ time: mark.time, chunk });
+      }
+
+      searchIndex = end;
+    });
+
+    if (searchIndex < original.length) {
+      const tailTime = marks[marks.length - 1]?.time ?? 0;
+      chunkEvents.push({ time: tailTime + 50, chunk: original.slice(searchIndex) });
+    }
+
+    if (!chunkEvents.length) {
+      setStreaming(false);
+      setRenderedReply(aiReply);
+      return;
+    }
+
+    chunkEvents.sort((a, b) => a.time - b.time);
+
+    setStreaming(true);
+    setRenderedReply("");
+
+    let currentIdx = 0;
+
+    const applyChunks = (count: number) => {
+      const combined = chunkEvents.slice(0, count).map((c) => c.chunk).join("");
+      setRenderedReply(count >= chunkEvents.length ? aiReply : combined);
+    };
+
+    const updateForTime = (ms: number) => {
+      const target = ms + SPEECH_LEAD_MS;
+      let nextIdx = currentIdx;
+      while (nextIdx < chunkEvents.length && chunkEvents[nextIdx].time <= target) {
+        nextIdx += 1;
+      }
+      if (nextIdx !== currentIdx) {
+        currentIdx = nextIdx;
+        applyChunks(currentIdx);
+      }
+    };
+
+    const step = () => {
+      if (!audio) return;
+      updateForTime(audio.currentTime * 1000);
+      if (!audio.paused && currentIdx < chunkEvents.length) {
+        animationFrameRef.current = window.requestAnimationFrame(step);
+      }
+    };
+
+    const handlePlay = () => {
+      if (animationFrameRef.current !== null) {
+        window.cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
+      }
+      updateForTime(audio.currentTime * 1000);
+      if (!audio.paused) {
+        animationFrameRef.current = window.requestAnimationFrame(step);
+      }
+    };
+
+    const handlePause = () => {
+      if (animationFrameRef.current !== null) {
+        window.cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
+      }
+      updateForTime(audio.currentTime * 1000);
+    };
+
+    const handleSeeked = () => {
+      updateForTime(audio.currentTime * 1000);
+      if (!audio.paused && animationFrameRef.current === null && currentIdx < chunkEvents.length) {
+        animationFrameRef.current = window.requestAnimationFrame(step);
+      }
+    };
+
+    const handleEnded = () => {
+      if (animationFrameRef.current !== null) {
+        window.cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
+      }
+      applyChunks(chunkEvents.length);
+      currentIdx = chunkEvents.length;
+      setStreaming(false);
+    };
+
+    audio.addEventListener("play", handlePlay);
+    audio.addEventListener("pause", handlePause);
+    audio.addEventListener("seeked", handleSeeked);
+    audio.addEventListener("ended", handleEnded);
+
+    handlePause();
+    if (!audio.paused) {
+      animationFrameRef.current = window.requestAnimationFrame(step);
+    }
 
     return () => {
-      window.clearInterval(intervalId);
+      audio.removeEventListener("play", handlePlay);
+      audio.removeEventListener("pause", handlePause);
+      audio.removeEventListener("seeked", handleSeeked);
+      audio.removeEventListener("ended", handleEnded);
+
+      if (animationFrameRef.current !== null) {
+        window.cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
+      }
     };
-  }, [aiReply]);
+  }, [aiReply, speechMarks, ttsPending]);
 
   useEffect(() => {
-    if (!audioRef.current) return;
+    const audio = audioRef.current;
     const trimmed = aiReply.trim();
-    if (!trimmed || trimmed === "…" || trimmed.startsWith("⚠️") || !isKnownPersona) {
+
+    if (!audio || !trimmed || trimmed === "…" || trimmed.startsWith("⚠️") || !isKnownPersona) {
+      setTtsPending(false);
+      setSpeechMarks([]);
+      if (trimmed && trimmed !== "…" && !trimmed.startsWith("⚠️")) {
+        setRenderedReply(trimmed);
+      }
+      setStreaming(false);
       stopAudio();
       return;
     }
@@ -219,13 +383,20 @@ export default function ChattingPage() {
     ttsAbortRef.current?.abort();
     ttsAbortRef.current = controller;
 
+    setTtsPending(true);
+    setSpeechMarks([]);
+    setStreaming(false);
+    setRenderedReply("");
+
     (async () => {
       try {
+        const sanitizedText = sanitizeForSpeech(trimmed);
+        const payloadText = sanitizedText.length ? sanitizedText : trimmed;
         const res = await fetch("/adk/api/tts", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
-          body: JSON.stringify({ persona: canonicalPersona, text: trimmed }),
+          body: JSON.stringify({ persona: canonicalPersona, text: payloadText }),
           signal: controller.signal,
         });
         if (!res.ok) {
@@ -236,15 +407,20 @@ export default function ChattingPage() {
         if (!payload?.audio || typeof payload.audio !== "string") {
           throw new Error("TTS response missing audio data");
         }
+        const marks = Array.isArray(payload?.meta?.speechMarks)
+          ? (payload.meta.speechMarks as SpeechMark[])
+          : [];
+        setSpeechMarks(marks);
+
         const blob = base64ToBlob(payload.audio, payload.contentType ?? "audio/mpeg");
         const url = URL.createObjectURL(blob);
 
         stopAudio();
         audioUrlRef.current = url;
-        audioRef.current.src = url;
-        audioRef.current.currentTime = 0;
+        audio.src = url;
+        audio.currentTime = 0;
         if (!mutedRef.current) {
-          await audioRef.current
+          await audio
             .play()
             .catch(() => {
               /* ignore autoplay errors */
@@ -253,13 +429,21 @@ export default function ChattingPage() {
       } catch (error) {
         if (!controller.signal.aborted) {
           console.error("Polly synthesis failed", error);
+          setSpeechMarks([]);
+          setRenderedReply(trimmed);
+          setStreaming(false);
         }
         stopAudio();
+      } finally {
+        if (!controller.signal.aborted) {
+          setTtsPending(false);
+        }
       }
     })();
 
     return () => {
       controller.abort();
+      setTtsPending(false);
     };
   }, [aiReply, name, isKnownPersona]);
 
@@ -291,6 +475,10 @@ export default function ChattingPage() {
     setInput("");
     setAiReply("…");
     setSending(true);
+    setSpeechMarks([]);
+    setRenderedReply("");
+    setStreaming(false);
+    setTtsPending(false);
 
     try {
       const res = await fetch(`/adk/agents/${name}/ask`, {
@@ -310,9 +498,20 @@ export default function ChattingPage() {
       }
 
       const data: AskResponse = isJson ? await res.json() : { reply: await res.text() };
+      setTtsPending(true);
+      setSpeechMarks([]);
+      setRenderedReply("");
+      setStreaming(false);
       setAiReply(String(data.reply ?? ""));
     } catch (e: any) {
-      if (e?.name !== "AbortError") setAiReply(`⚠️ ${e?.message ?? String(e)}`);
+      if (e?.name !== "AbortError") {
+        const message = `⚠️ ${e?.message ?? String(e)}`;
+        setAiReply(message);
+        setRenderedReply(message);
+      }
+      setTtsPending(false);
+      setSpeechMarks([]);
+      setStreaming(false);
     } finally {
       setSending(false);
     }
@@ -330,6 +529,9 @@ export default function ChattingPage() {
     ttsAbortRef.current?.abort();
     stopAudio();
     setRenderedReply("");
+    setSpeechMarks([]);
+    setTtsPending(false);
+    setStreaming(false);
   }
 
   return (
@@ -483,7 +685,7 @@ export default function ChattingPage() {
                       ))}
                     </div>
                   ) : (
-                    <p className="whitespace-pre-wrap leading-relaxed">{renderedReply}</p>
+                    <p className="whitespace-pre-wrap leading-relaxed">{streaming ? renderedReply : renderedReply || aiReply}</p>
                   )}
                 </div>
               </div>

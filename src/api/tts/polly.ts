@@ -16,6 +16,7 @@ import type {
   VoiceGenerativeSpec,
   TtsRequestBody,
   TtsResponseMeta,
+  SpeechMark,
 } from "./types.js";
 
 const DEFAULT_REGION = process.env.AWS_REGION || "ap-south-1";
@@ -119,6 +120,60 @@ function clamp(value: number, min: number, max: number) {
 
 function cloneGenerative(spec: VoiceGenerativeSpec): VoiceGenerativeSpec {
   return JSON.parse(JSON.stringify(spec)) as VoiceGenerativeSpec;
+}
+
+async function fetchSpeechMarks(
+  client: PollyClient,
+  baseParams: SynthesizeSpeechCommandInput,
+): Promise<SpeechMark[]> {
+  try {
+    const params: SynthesizeSpeechCommandInput = {
+      VoiceId: baseParams.VoiceId,
+      Text: baseParams.Text,
+      TextType: baseParams.TextType,
+      Engine: baseParams.Engine,
+      LanguageCode: baseParams.LanguageCode,
+      OutputFormat: "json",
+      SpeechMarkTypes: ["word"],
+    };
+
+    const response = await client.send(new SynthesizeSpeechCommand(params));
+    const buffer = await streamToBuffer(response.AudioStream);
+    const raw = buffer.toString("utf8").trim();
+    if (!raw) return [];
+
+    const marks = raw
+      .split(/\r?\n/)
+      .map((line) => {
+        try {
+          const parsed = JSON.parse(line) as Record<string, unknown>;
+          if (parsed?.type !== "word" || typeof parsed.value !== "string") {
+            return null;
+          }
+          const time = Number(parsed.time ?? 0);
+          if (Number.isNaN(time)) return null;
+          const start =
+            typeof parsed.start === "number" ? Math.max(0, parsed.start) : undefined;
+          const end =
+            typeof parsed.end === "number" ? Math.max(0, parsed.end) : undefined;
+          return {
+            time,
+            type: "word",
+            value: parsed.value,
+            start,
+            end,
+          } satisfies SpeechMark;
+        } catch {
+          return null;
+        }
+      })
+      .filter((mark): mark is SpeechMark => Boolean(mark));
+
+    return marks;
+  } catch (error) {
+    console.warn("[Polly] Failed to fetch speech marks:", error);
+    return [];
+  }
 }
 
 function deriveDynamicSpec(
@@ -354,6 +409,7 @@ export async function synthesizePollySpeech(body: TtsRequestBody): Promise<Polly
       }
 
       const processedBuffer = await applyGenerativeEffects(baseBuffer, config, effectiveSpec);
+      const speechMarks = await fetchSpeechMarks(client, params);
       const analysis = await analyzeAudio(processedBuffer, effectiveText, config);
 
       const meta: TtsResponseMeta = {
@@ -372,6 +428,7 @@ export async function synthesizePollySpeech(body: TtsRequestBody): Promise<Polly
           seed: body.seed,
         },
         analysis,
+        speechMarks,
       };
 
       if (attempt.allowCache) {

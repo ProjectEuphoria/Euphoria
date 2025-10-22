@@ -21,6 +21,7 @@ EUPHORIA is a **multi-persona conversational system** that feels **human**, not 
 - **Stable tone** via carefully engineered prompts + short, decisive replies.
 
 ### 🧠 Personas at a glance
+- **Tone target:** high-school anime archetypes — expressive, quick on their feet, and always a little larger than life.
 - **Helena** — *Calm mentor.* Brings order to chaos, outlines next steps. DEEP: “Guardian” for panic/guilt.
 - **Luna** — *Sarcastic best friend.* Tough love + protective edge. DEEP: “Nova” for anger/betrayal.
 - **Milo** — *Chaos gremlin of optimism.* Hype + humor. DEEP: “Eve” for numbness/flat affect.
@@ -39,6 +40,8 @@ EUPHORIA is a **multi-persona conversational system** that feels **human**, not 
 
 ### 🖥️ Frontend UX (React)
 - Landing → persona cards → chat page.
+- `/about` — “Why Euphoria Exists”: emotional framing, problem statement, science, mission CTA.
+- `/community` — “Community of the Curious”: highlights explorers/creators/builders + join links.
 - Cozy UI / “main character energy” visuals per persona (assets provided).
 - Protected routes & auth stubs ready (signin/signup/logout).
 
@@ -51,7 +54,7 @@ EUPHORIA is a **multi-persona conversational system** that feels **human**, not 
 
 src
 ├─ App/                      # React app (Vite)
-│  ├─ Pages/                 # Landing, Chatting, About, Auth UI
+│  ├─ Pages/                 # Landing, Chatting, About, Community, Auth UI
 │  ├─ styles/                # CSS
 ├─ Components/               # UI components (Cards/Effects/Layout etc.)
 ├─ agents/                   # Persona agents + shared tool guidance
@@ -113,6 +116,12 @@ Each `agents/<Persona>/agent.ts` builds an instruction with:
   - Calm or momentum → return to BASE.
 - **Hysteresis/decay** handled by light store & instruction phrasing (prevents ping-ponging tone).
 
+### 🎧 Speech-aligned responses
+- The chat surface streams each reply **in lockstep with voice playback**.
+- Amazon Polly speech marks (`word` timestamps) are fetched alongside the audio buffer.
+- The UI reveals the original reply chunk-by-chunk (no sanitised text is shown to the user) with an ~80 ms lead so the transcript feels natural.
+- If speech marks are missing or audio fails, the bubble gracefully falls back to the full reply text.
+
 ### 🛠️ MCP & tools
 - `mcp/servers/*.server.ts` expose domain utilities over MCP (web search, trends, wiki, journal, quotes, unsplash, spotify).
 - `mcp/toolsets/*` bundle tools for easy persona attachment.
@@ -147,7 +156,6 @@ NODE_ENV=development
 
 ```bash
 npm i
-# or npm i
 
 # start backend (API)
 npm run api:dev
@@ -168,11 +176,34 @@ npm run api:prod # start API in prod mode (pm2 or node)
 
 ### 📡 API: TTS (Polly)
 
-* **Route:** `POST /api/tts/say`
-* **Body:** `{ "text": "<speak>SSML here</speak>", "voiceId": "Joanna", "format": "mp3" }`
-* **Response:** `{ "key": "polly/Joanna/...", "url": "https://..." }` (signed GET or CDN URL)
-
-> **Persona→voice mapping**: keep voice consistent per persona, and use SSML blocks for mode shifts (e.g., Kai Commander cadence).
+* **Route:** `POST /adk/api/tts`
+* **Body:**  
+  ```jsonc
+  {
+    "persona": "Milo",
+    "text": "Keep breathing, I've got you.",
+    "style": "dynamic",           // optional contour
+    "sentiment": "excited"        // optional tuning
+  }
+  ```
+* **Response:**  
+  ```jsonc
+  {
+    "ok": true,
+    "contentType": "audio/mpeg",
+    "audio": "<base64 mp3>",
+    "meta": {
+      "persona": "Milo",
+      "speechMarks": [
+        { "time": 112, "value": "Keep", "type": "word" },
+        { "time": 260, "value": "breathing", "type": "word" }
+      ],
+      "...": "timing, cache, dsp info"
+    }
+  }
+  ```
+* The client converts the base64 audio to an object URL and streams the transcript using the returned speech marks.
+* **Persona → voice mapping** lives in `src/api/tts/config.ts`; keep each persona locked to a consistent Polly voice & SSML profile.
 
 ### 🧾 Cost awareness (rough)
 
