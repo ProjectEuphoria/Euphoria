@@ -1,74 +1,305 @@
-# React + TypeScript + Vite
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+# EUPHORIA
 
-Currently, two official plugins are available:
+Human-feeling AI personas that adapt tone and behavior in real time, with tool-use, memory, and clean web delivery.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+> Personas: **Helena, Luna, Milo, Kai, Sophie**  
+> Runtime model: `gemini-2.5-flash` by default (swap per persona)  
+> Tools: built-in `web_search`, internal `emotion_analysis` (prompted), Telegram/Discord persona tools, MCP toolsets (web search, trends, quotes, journal, etc.)  
+> Voice: Amazon Polly (optional; production template included)  
+> UI: React + Vite app, static deploy; Node/TS backend (Fastify-style HTTP server)
 
-## React Compiler
+---
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## 1) WHAT THIS PROJECT IS (FEATURES & USER VALUE)
 
-## Expanding the ESLint configuration
+### ✨ Core idea
+EUPHORIA is a **multi-persona conversational system** that feels **human**, not “AI-ish”. Each persona has:
+- **Dual-mode behavior** (BASE ↔ DEEP) that shifts from casual to protective/grounded when user emotion spikes.
+- **Emotion inference** from language cues (caps, punctuation, pace) — *no external emotion ML needed for v1*.
+- **Selective tool use** (web search for citations; Telegram/Discord for outreach; MCP for utilities).
+- **Stable tone** via carefully engineered prompts + short, decisive replies.
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+### 🧠 Personas at a glance
+- **Helena** — *Calm mentor.* Brings order to chaos, outlines next steps. DEEP: “Guardian” for panic/guilt.
+- **Luna** — *Sarcastic best friend.* Tough love + protective edge. DEEP: “Nova” for anger/betrayal.
+- **Milo** — *Chaos gremlin of optimism.* Hype + humor. DEEP: “Eve” for numbness/flat affect.
+- **Kai** — *Older-brother coach.* Discipline, clipped commands. DEEP: “Commander” for guilt/stagnation.
+- **Sophie** — *Cozy study buddy.* Gentle plans + check-ins. DEEP: “Mirror” for loneliness/exhaustion.
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+### 🔌 Tools & integrations
+- **Built-in model tools**: `web_search` (citations), structured outputs, function-calling.  
+- **Persona messengers**: `personaTelegram`, `personaDiscord` (per-persona channels).  
+- **MCP toolsets** (`/mcp`):
+  - `webSearch.server.ts`, `wikipedia.server.ts`, `trends.server.ts`
+  - `quotes.server.ts`, `journal.server.ts`, `spotify.server.ts`, `unsplash.server.ts`
+  - Toolsets: `emotion`, `summarizer`, `wellness`, `visuals`, `knowledge`, `localContext`, etc.
+- **Voice** (optional): Amazon Polly via `/api/tts` route; SSML per persona.
+- **Storage**: light state store (`/state/store`) with in-memory + fs adapters.
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+### 🖥️ Frontend UX (React)
+- Landing → persona cards → chat page.
+- Cozy UI / “main character energy” visuals per persona (assets provided).
+- Protected routes & auth stubs ready (signin/signup/logout).
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+---
+
+## 2) HOW IT WORKS (ARCHITECTURE, SETUP & OPERATIONS)
+
+### 📁 Repository layout (matches your tree)
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+src
+├─ App/                      # React app (Vite)
+│  ├─ Pages/                 # Landing, Chatting, About, Auth UI
+│  ├─ styles/                # CSS
+├─ Components/               # UI components (Cards/Effects/Layout etc.)
+├─ agents/                   # Persona agents + shared tool guidance
+│  ├─ Helena/agent.ts
+│  ├─ Luna/agent.ts
+│  ├─ Milo/agent.ts
+│  ├─ Kai/agent.ts
+│  ├─ Sophie/agent.ts
+│  ├─ index.ts               # registry
+│  ├─ sharedTools.ts         # loads persona tools
+│  ├─ toolGuidance.ts        # per-tool usage tips
+│  └─ version.ts
+├─ api/                      # Backend APIs
+│  ├─ http.server.ts         # (Fastify-style) HTTP server
+│  └─ tts/                   # Amazon Polly integration
+│     ├─ route.ts            # POST /api/tts/say
+│     ├─ polly.ts            # SDK v3 client
+│     ├─ processor.ts        # SSML helpers
+│     ├─ cache.ts            # (optional) result cache
+│     └─ config.ts|types.ts
+├─ mcp/                      # Model Context Protocol servers & toolsets
+│  ├─ servers/*.server.ts
+│  ├─ toolsets/*.ts
+│  └─ utils/http.ts
+├─ state/                    # Light state + services
+│  ├─ store/fs.ts|memory.ts
+│  ├─ models.ts|selectors.ts|services.ts
+├─ assets/                   # Posters/backgrounds
+├─ lib/utils.ts
+├─ db.ts                     # (placeholder / connect later)
+├─ index.ts                  # App entry
+└─ types/fastify-plugin.d.ts
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
 ```
-# Euphoria
+
+### 🧩 High-level diagram
+
+```
+
+[User] ──> [React UI] ──> [/agents/* persona] ──> [OpenAI GPT-5-mini]
+└─> [MCP toolsets] ──────> (web, wiki, trends, quotes)
+└─> [Telegram/Discord tools]
+└─> [/api/tts (Polly)] ──> [S3/CDN] (audio/video)
+
+````
+
+### 🗣️ Persona prompts (production pattern)
+Each `agents/<Persona>/agent.ts` builds an instruction with:
+- **Global intent & tool rules** (emotion inference + search policy).
+- **Base mode** behavior (tone, cadence, example lines).
+- **Deep mode** behavior with triggers and exit cues.
+- **Tool-specific notes** (Telegram/Discord, guidance injection).
+- *No “AI” self-reference*: personas speak like **people**.
+
+### 🔁 Conversation dynamics
+- **One-pass** by default (mini model “reads” emotion via context).
+- **Mode switching** done by prompt rules:
+  - Intensity ↑ → shift to DEEP.
+  - Calm or momentum → return to BASE.
+- **Hysteresis/decay** handled by light store & instruction phrasing (prevents ping-ponging tone).
+
+### 🛠️ MCP & tools
+- `mcp/servers/*.server.ts` expose domain utilities over MCP (web search, trends, wiki, journal, quotes, unsplash, spotify).
+- `mcp/toolsets/*` bundle tools for easy persona attachment.
+- `agents/sharedTools.ts` loads a persona’s allowed toolset.
+
+### 🔐 Auth & security
+- `src/api/auth/*` stubs for signin/signup/logout; wrap routes with your provider (Clerk, Supabase, Auth0, custom).
+- **Never** expose API keys in client; tools call server endpoints or MCP servers under your control.
+- If you enable Polly/S3: use **signed GET** for media delivery; writes happen server-side only.
+
+### 🧪 Local development
+
+#### 1) Environment
+Create `.env` at project root:
+```bash
+# OpenAI
+OPENAI_API_KEY=sk-...
+
+# AWS (for Polly; optional)
+AWS_REGION=us-east-1
+AWS_ACCESS_KEY_ID=...
+AWS_SECRET_ACCESS_KEY=...
+POLLY_BUCKET=euphoria-media-<yourid>
+
+# App
+PORT=5173
+API_PORT=8787
+NODE_ENV=development
+````
+
+#### 2) Install & run
+
+```bash
+npm i
+# or npm i
+
+# start backend (API)
+npm run api:dev
+# expected: http.server.ts listens on API_PORT
+
+# start frontend (Vite)
+npm run dev
+# open http://localhost:5173
+```
+
+#### 3) Build & prod
+
+```bash
+npm run build    # bundles React
+npm run preview  # static preview
+npm run api:prod # start API in prod mode (pm2 or node)
+```
+
+### 📡 API: TTS (Polly)
+
+* **Route:** `POST /api/tts/say`
+* **Body:** `{ "text": "<speak>SSML here</speak>", "voiceId": "Joanna", "format": "mp3" }`
+* **Response:** `{ "key": "polly/Joanna/...", "url": "https://..." }` (signed GET or CDN URL)
+
+> **Persona→voice mapping**: keep voice consistent per persona, and use SSML blocks for mode shifts (e.g., Kai Commander cadence).
+
+### 🧾 Cost awareness (rough)
+
+* `gpt-5-mini`: **$0.25 / 1M input tokens**, **$2.00 / 1M output tokens**.
+* Typical persona reply (concise): 100–250 tokens → fractions of a cent.
+* You can cap monthly spend in the OpenAI dashboard.
+
+### 🧰 Production checklist
+
+* [ ] `.env` in server only; never bundle keys in React.
+* [ ] Enable **CORS** only for your domain.
+* [ ] Logging: request IDs, tool calls, token usage.
+* [ ] Health endpoint (`/healthz`) + uptime monitor.
+* [ ] Error boundaries in UI.
+* [ ] Rate limiting on API routes.
+* [ ] Cloud build (Fly.io, Render, Vercel functions, or AWS Lambda).
+* [ ] If using S3: set cache headers & CloudFront.
+
+---
+
+## 3) WHAT’S NEXT (ROADMAP & INTEGRATIONS)
+
+### 🎙️ Voice: Amazon Polly (v1)
+
+* **Why:** ultra-reliable, low-latency TTS for each persona.
+* **How:** already scaffolded under `src/api/tts`.
+* **Action items:**
+
+  1. Set IAM role with `polly:SynthesizeSpeech`, `s3:GetObject/PutObject`.
+  2. Map voices per persona (`config.ts`).
+  3. Use SSML templates per mode (Guardian/Nova/Eve/Commander/Mirror).
+  4. Serve via S3 + CloudFront.
+
+**Sample SSML (Kai Commander):**
+
+```xml
+<speak>
+  <prosody rate="95%" pitch="-2st">Focus.</prosody>
+  <break time="300ms"/>
+  <prosody rate="96%">Open the doc. Two minutes. Now.</prosody>
+</speak>
+```
+
+### 🧊 Visuals: Blender → Web
+
+* **Fastest path:** render MP4/WebM and host on S3; embed `<video>` with poster frames.
+* **Interactive later:** export `.glb` and load via three.js `GLTFLoader` (watch mobile perf).
+
+### 🔁 Automation: n8n (post-presentation)
+
+* Use n8n for **execution**: post agent content to socials, log to Notion, send Telegram pings, etc.
+* Pattern:
+
+  1. **Webhook** node (trigger).
+  2. **HTTP Request** node → EUPHORIA `/agents/:persona` endpoint (chat/completions).
+  3. **Switch** on persona/mode → platform formatters.
+  4. **Publish** via platform nodes (X/LinkedIn/Discord/Telegram/YouTube).
+* Keep your **reasoning in agents**, **actions in n8n**.
+
+### 🧠 Model strategy
+
+* Default to **`gpt-5-mini`** for chat.
+* Use **`gpt-5`** only for heavy creative synthesis (rare turns).
+* If needed for bulk ops, add **`gpt-5-nano`** for summaries/tags (no built-in web search).
+
+### 🧪 QA & eval
+
+* Create **golden conversations** per persona (10–20 turns) and snapshot regressions.
+* Track **mode switches** and **token usage** per turn.
+* Add **unit tests** for MCP servers (e.g., `webSearch.server.ts` happy-path and no-result cases).
+
+### 🛡️ Safety & guardrails
+
+* Guided refusal patterns for medical/financial/legal extremes.
+* Tone clamps in DEEP modes (no shaming; pressure without cruelty).
+* Always prefer **citations** when using `web_search`.
+
+### 📦 Deployment options
+
+* **Frontend**: S3 + CloudFront or Vercel/Netlify.
+* **Backend**: Fly.io, Render, Railway, AWS Lambda/API Gateway.
+* **Media**: S3 (+ optional CloudFront CDN).
+* **Secrets**: `.env` via platform secrets manager.
+
+---
+
+## QUICKSTART (DEV TL;DR)
+
+```bash
+# 1) Install
+pnpm i
+
+# 2) Env
+cp .env.example .env  # fill keys
+
+# 3) Run API + Frontend
+pnpm run api:dev
+pnpm run dev
+
+# 4) Open
+http://localhost:5173
+```
+
+---
+
+## FAQ
+
+**Q: Do I need a separate emotion model?**
+A: No. The personas infer emotion from text cues using prompt rules. Add an ML classifier later only if you need precision metrics.
+
+**Q: Can these agents browse the web?**
+A: Yes, via the model’s built-in `web_search` (and/or MCP `webSearch.server.ts`). We return summaries with citations.
+
+**Q: How do I keep bills low?**
+A: Use `gpt-5-mini` for 90% of turns, `gpt-5` for occasional deep synthesis. Keep replies short by design.
+
+---
+
+## LICENSE
+
+Proprietary — © You (2025).
+(Replace with MIT/Apache-2.0 if you plan to open-source.)
+
+```
+
+---
+
+If you want, I can also generate a **`.env.example`**, a **SAM/CloudFormation** snippet for the Polly Lambda + API, or a **diagram image** (Mermaid) you can drop into the README.
+::contentReference[oaicite:0]{index=0}
+```
