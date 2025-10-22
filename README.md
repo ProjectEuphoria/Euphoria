@@ -263,14 +263,14 @@ npm run api:prod # start API in prod mode (pm2 or node)
 
 ```bash
 # 1) Install
-pnpm i
+npm install
 
 # 2) Env
 cp .env.example .env  # fill keys
 
 # 3) Run API + Frontend
-pnpm run api:dev
-pnpm run dev
+npm run api:dev
+npm run dev
 
 # 4) Open
 http://localhost:5173

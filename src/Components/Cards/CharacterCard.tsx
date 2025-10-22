@@ -25,7 +25,6 @@ const CharacterCard: FC<CharacterCardProps> = ({
         group relative overflow-hidden rounded-2xl
         bg-background/40 ring-1 ring-border/60
         shadow-[0_10px_30px_var(--shadow-md,rgba(0,0,0,0.35))]
-        transition-transform duration-200 hover:-translate-y-1
         focus:outline-none focus-visible:ring-2 focus-visible:ring-ring
         text-left
       "
@@ -36,7 +35,7 @@ const CharacterCard: FC<CharacterCardProps> = ({
         <img
           src={imageSrc}
           alt={name}
-          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
+          className="h-full w-full object-cover"
         />
       </div>
 
@@ -56,9 +55,9 @@ const CharacterCard: FC<CharacterCardProps> = ({
       <div
         className="
           absolute inset-x-0 bottom-0 z-0 h-full
-          translate-y-full opacity-0
-          transition-all duration-300 ease-out
-          group-hover:translate-y-0 group-hover:opacity-100
+          opacity-0 pointer-events-none
+          transition-opacity duration-300 ease-out
+          group-hover:opacity-100
           bg-gradient-to-t from-black/80 via-black/50 to-transparent
           backdrop-blur-sm
           px-3 pb-3 pt-16
