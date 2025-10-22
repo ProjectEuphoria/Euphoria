@@ -1,14 +1,14 @@
 import { useState, type FC } from "react";
-import { Globe, Menu, X } from "lucide-react";
+import { Menu, X } from "lucide-react";
+import { Link } from "react-router-dom";
 import Logo from "../Brand/Logo";
 import LogoutBtn from "../LogoutBtn";
 
 type NavLink = { href: string; label: string };
 const LINKS: NavLink[] = [
-    { href: "#about", label: "About Us" },
-    { href: "#community", label: "Community" },
+    { href: "/about", label: "About Us" },
+    { href: "/community", label: "Community" },
     { href: "https://github.com/ProjectEuphoria/Euphoria", label: "Github" },
-    { href: "#help", label: "Help" },
 ];
 
 const Navbar: FC = () => {
@@ -19,14 +19,14 @@ const Navbar: FC = () => {
             <nav className="relative mx-auto flex h-16 max-w-7xl items-center justify-between px-3 sm:px-6 lg:px-8" style={{height:"150px"}}>
                 {/* Left: Logo */}
                 <div className=" h-full" style={{width:"190px"}}>
-                <a className="flex"
-                    href="#home"
+                <Link className="flex"
+                    to="/"
                     style={{height:"100%",width:"100%"}}
 
                 >
                     {/* Your Logo component renders the round E mark */}
                     <Logo size="md" />
-                </a></div>
+                </Link></div>
 
                 {/* Center: Links (desktop) */}
                 <div>
@@ -37,13 +37,21 @@ const Navbar: FC = () => {
     items-center gap-10 text-white font-serif text-xl
   "
                 >
-                    {LINKS.map((l) => (
+                    {LINKS.map((l) => {
+                        const isExternal = l.href.startsWith("http");
+                        return (
                         <li key={l.href}>
-                            <a href={l.href} className="transition-colors hover:text-white/90">
-                                {l.label}
-                            </a>
+                            {isExternal ? (
+                                <a href={l.href} className="transition-colors hover:text-white/90" target="_blank" rel="noreferrer">
+                                    {l.label}
+                                </a>
+                            ) : (
+                                <Link to={l.href} className="transition-colors hover:text-white/90">
+                                    {l.label}
+                                </Link>
+                            )}
                         </li>
-                    ))}
+                    )})}
                     <li>
                             <LogoutBtn/>
                         </li>
@@ -67,17 +75,31 @@ const Navbar: FC = () => {
             {open && (
                 <div className="md:hidden border-t border-white/10 bg-[#130015]/95 backdrop-blur">
                     <ul className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-3 grid gap-1 text-white font-serif text-lg">
-                        {LINKS.map((l) => (
+                        {LINKS.map((l) => {
+                            const isExternal = l.href.startsWith("http");
+                            return (
                             <li key={l.href}>
-                                <a
-                                    href={l.href}
-                                    className="block rounded-lg px-3 py-2 hover:bg-white/5"
-                                    onClick={() => setOpen(false)}
-                                >
-                                    {l.label}
-                                </a>
+                                {isExternal ? (
+                                    <a
+                                        href={l.href}
+                                        className="block rounded-lg px-3 py-2 hover:bg-white/5"
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        onClick={() => setOpen(false)}
+                                    >
+                                        {l.label}
+                                    </a>
+                                ) : (
+                                    <Link
+                                        to={l.href}
+                                        className="block rounded-lg px-3 py-2 hover:bg-white/5"
+                                        onClick={() => setOpen(false)}
+                                    >
+                                        {l.label}
+                                    </Link>
+                                )}
                             </li>
-                        ))}
+                        )})}
                         <li>
                             <LogoutBtn/>
                         </li>
