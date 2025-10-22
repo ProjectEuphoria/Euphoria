@@ -113,6 +113,135 @@ function buildSsml(text: string, persona: PersonaVoiceSpec): string {
   return buildStyledSsml(text, persona);
 }
 
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function cloneGenerative(spec: VoiceGenerativeSpec): VoiceGenerativeSpec {
+  return JSON.parse(JSON.stringify(spec)) as VoiceGenerativeSpec;
+}
+
+function deriveDynamicSpec(
+  personaSpec: PersonaVoiceSpec,
+  body: TtsRequestBody,
+): PersonaVoiceSpec {
+  const generated = cloneGenerative(personaSpec.generative);
+  const apply = (updates: Partial<VoiceGenerativeSpec>) => {
+    if (updates.pitchSemitones !== undefined) {
+      generated.pitchSemitones = clamp(
+        generated.pitchSemitones + updates.pitchSemitones,
+        -6,
+        6,
+      );
+    }
+    if (updates.ratePct !== undefined) {
+      generated.ratePct = clamp(generated.ratePct + updates.ratePct, -20, 20);
+    }
+    if (updates.eq) {
+      generated.eq.lowShelfDb = clamp(
+        generated.eq.lowShelfDb + (updates.eq.lowShelfDb ?? 0),
+        -6,
+        6,
+      );
+      generated.eq.presenceDb = clamp(
+        generated.eq.presenceDb + (updates.eq.presenceDb ?? 0),
+        -6,
+        6,
+      );
+      generated.eq.airDb = clamp(
+        generated.eq.airDb + (updates.eq.airDb ?? 0),
+        -6,
+        6,
+      );
+    }
+    if (updates.reverb) {
+      generated.reverb.mix = clamp(
+        generated.reverb.mix + (updates.reverb.mix ?? 0),
+        0,
+        0.5,
+      );
+      generated.reverb.predelayMs = clamp(
+        generated.reverb.predelayMs + (updates.reverb.predelayMs ?? 0),
+        0,
+        50,
+      );
+    }
+    if (updates.breath) {
+      generated.breath.prob = clamp(
+        generated.breath.prob + (updates.breath.prob ?? 0),
+        0,
+        0.3,
+      );
+    }
+  };
+
+  switch (body.sentiment) {
+    case "excited":
+      apply({
+        pitchSemitones: 0.8,
+        ratePct: 8,
+        eq: { presenceDb: 0.6, airDb: 0.5 },
+        breath: { prob: 0.03 },
+      });
+      break;
+    case "pos":
+      apply({ pitchSemitones: 0.4, ratePct: 3 });
+      break;
+    case "neg":
+      apply({
+        pitchSemitones: -0.4,
+        ratePct: -4,
+        eq: { lowShelfDb: -0.3, presenceDb: -0.2 },
+      });
+      break;
+    case "calm":
+      apply({
+        pitchSemitones: -0.5,
+        ratePct: -6,
+        reverb: { mix: 0.04 },
+      });
+      break;
+    case "serious":
+      apply({
+        pitchSemitones: -0.3,
+        ratePct: -4,
+        eq: { presenceDb: -0.3 },
+      });
+      break;
+    default:
+      break;
+  }
+
+  switch (body.style) {
+    case "dynamic":
+      apply({ pitchSemitones: 0.3, ratePct: 4, breath: { prob: 0.02 } });
+      break;
+    case "encouraging":
+      apply({ pitchSemitones: 0.2, ratePct: 2 });
+      break;
+    case "serene":
+      apply({
+        pitchSemitones: -0.2,
+        ratePct: -4,
+        reverb: { mix: 0.03 },
+      });
+      break;
+    case "composed":
+      apply({ ratePct: -2, eq: { presenceDb: -0.2 } });
+      break;
+    case "grounded":
+      apply({ ratePct: -1, eq: { lowShelfDb: 0.4 } });
+      break;
+    default:
+      break;
+  }
+
+  return {
+    ...personaSpec,
+    generative: generated,
+  };
+}
+
 export interface PollySynthesisResult {
   buffer: Buffer;
   contentType: string;
@@ -133,13 +262,15 @@ export async function synthesizePollySpeech(body: TtsRequestBody): Promise<Polly
     throw new Error(`Unknown persona voice spec: ${persona}`);
   }
 
+  const effectiveSpec = deriveDynamicSpec(personaSpec, body);
+
   const cacheKey = buildCacheKey({
     persona,
     text: effectiveText,
     style: body.style ?? null,
     sentiment: body.sentiment ?? null,
     seed: body.seed ?? null,
-    spec: personaSpec,
+    spec: effectiveSpec.generative,
   });
 
   const cached = await loadFromCache(config, cacheKey);
@@ -166,7 +297,7 @@ export async function synthesizePollySpeech(body: TtsRequestBody): Promise<Polly
       label: "styled-ssml",
       engine: personaSpec.engine,
       textType: "ssml",
-      payload: buildSsml(effectiveText, personaSpec),
+      payload: buildSsml(effectiveText, effectiveSpec),
       allowCache: true,
       ssmlProsody: true,
     },
@@ -222,19 +353,19 @@ export async function synthesizePollySpeech(body: TtsRequestBody): Promise<Polly
         throw new Error("Polly returned an empty audio buffer");
       }
 
-      const processedBuffer = await applyGenerativeEffects(baseBuffer, config, personaSpec);
+      const processedBuffer = await applyGenerativeEffects(baseBuffer, config, effectiveSpec);
       const analysis = await analyzeAudio(processedBuffer, effectiveText, config);
 
       const meta: TtsResponseMeta = {
         persona,
-        baseVoice: personaSpec.base,
+        baseVoice: effectiveSpec.base,
         engine: attempt.engine,
         applied: {
           ssmlProsody: attempt.ssmlProsody,
           pollyNeural: attempt.engine === "neural",
           dspPost: processedBuffer !== baseBuffer,
         },
-        generative: personaSpec.generative,
+        generative: effectiveSpec.generative,
         request: {
           style: body.style,
           sentiment: body.sentiment,
