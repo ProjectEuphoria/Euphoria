@@ -75,6 +75,7 @@ export default function ChattingPage() {
   const audioUrlRef = useRef<string>("");
   const ttsAbortRef = useRef<AbortController | null>(null);
   const mutedRef = useRef(muted);
+  const [renderedReply, setRenderedReply] = useState("");
 
   // Optional voice input
   useEffect(() => {
@@ -174,6 +175,37 @@ export default function ChattingPage() {
       audioUrlRef.current = "";
     }
   };
+
+  useEffect(() => {
+    if (!aiReply || aiReply === "…" || aiReply.startsWith("⚠️")) {
+      setRenderedReply(aiReply);
+      return;
+    }
+
+    const tokens = aiReply.split(/(\s+)/);
+    if (tokens.length === 0) {
+      setRenderedReply(aiReply);
+      return;
+    }
+
+    let index = 0;
+    setRenderedReply(tokens[index] ?? "");
+    index += 1;
+
+    if (index >= tokens.length) return;
+
+    const intervalId = window.setInterval(() => {
+      setRenderedReply((prev) => prev + (tokens[index] ?? ""));
+      index += 1;
+      if (index >= tokens.length) {
+        window.clearInterval(intervalId);
+      }
+    }, 90);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [aiReply]);
 
   useEffect(() => {
     if (!audioRef.current) return;
@@ -297,6 +329,7 @@ export default function ChattingPage() {
     setInput("");
     ttsAbortRef.current?.abort();
     stopAudio();
+    setRenderedReply("");
   }
 
   return (
@@ -450,7 +483,7 @@ export default function ChattingPage() {
                       ))}
                     </div>
                   ) : (
-                    <p className="whitespace-pre-wrap leading-relaxed">{aiReply}</p>
+                    <p className="whitespace-pre-wrap leading-relaxed">{renderedReply}</p>
                   )}
                 </div>
               </div>
