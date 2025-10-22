@@ -71,6 +71,14 @@ function escapeXml(text: string): string {
     .replace(/'/g, "&apos;");
 }
 
+function sanitizeText(text: string): string {
+  return text
+    .replace(/\p{Extended_Pictographic}/gu, "")
+    .replace(/[\uFE0F\u200D]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function buildStyledSsml(text: string, persona: PersonaVoiceSpec): string {
   const {
     prosody: { pauseMs },
@@ -113,6 +121,9 @@ export interface PollySynthesisResult {
 
 export async function synthesizePollySpeech(body: TtsRequestBody): Promise<PollySynthesisResult> {
   const { persona, text } = body;
+  const cleanedText = sanitizeText(text);
+  const effectiveText = cleanedText.length ? cleanedText : text;
+
   const [config, personaSpec] = await Promise.all([
     getVoiceConfig(),
     getPersonaSpec(persona),
@@ -124,7 +135,7 @@ export async function synthesizePollySpeech(body: TtsRequestBody): Promise<Polly
 
   const cacheKey = buildCacheKey({
     persona,
-    text,
+    text: effectiveText,
     style: body.style ?? null,
     sentiment: body.sentiment ?? null,
     seed: body.seed ?? null,
@@ -155,7 +166,7 @@ export async function synthesizePollySpeech(body: TtsRequestBody): Promise<Polly
       label: "styled-ssml",
       engine: personaSpec.engine,
       textType: "ssml",
-      payload: buildSsml(text, personaSpec),
+      payload: buildSsml(effectiveText, personaSpec),
       allowCache: true,
       ssmlProsody: true,
     },
@@ -163,7 +174,7 @@ export async function synthesizePollySpeech(body: TtsRequestBody): Promise<Polly
       label: "plain-ssml",
       engine: personaSpec.engine,
       textType: "ssml",
-      payload: buildPlainSsml(text),
+      payload: buildPlainSsml(effectiveText),
       allowCache: true,
       ssmlProsody: false,
     },
@@ -171,7 +182,7 @@ export async function synthesizePollySpeech(body: TtsRequestBody): Promise<Polly
       label: "plain-text",
       engine: personaSpec.engine,
       textType: "text",
-      payload: text,
+      payload: effectiveText,
       allowCache: true,
       ssmlProsody: false,
     },
@@ -182,7 +193,7 @@ export async function synthesizePollySpeech(body: TtsRequestBody): Promise<Polly
       label: "plain-text-standard",
       engine: "standard",
       textType: "text",
-      payload: text,
+      payload: effectiveText,
       allowCache: true,
       ssmlProsody: false,
     });
@@ -212,7 +223,7 @@ export async function synthesizePollySpeech(body: TtsRequestBody): Promise<Polly
       }
 
       const processedBuffer = await applyGenerativeEffects(baseBuffer, config, personaSpec);
-      const analysis = await analyzeAudio(processedBuffer, text, config);
+      const analysis = await analyzeAudio(processedBuffer, effectiveText, config);
 
       const meta: TtsResponseMeta = {
         persona,
