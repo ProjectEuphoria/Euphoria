@@ -162,6 +162,7 @@ export default function ChattingPage() {
   const otherBots = allBots.filter((bot) => bot.toLowerCase() !== normalizedName);
   const bgImg = PERSONA_BACKGROUNDS[normalizedName];
   const canonicalPersona = allBots.find((bot) => bot.toLowerCase() === normalizedName) ?? allBots[0];
+  const isLoadingReply = sending && aiReply === "…";
 
   const stopAudio = () => {
     if (audioRef.current) {
@@ -426,7 +427,7 @@ export default function ChattingPage() {
             {/* User bubble (top) */}
             {userLocked && (
               <div className="flex justify-end mb-3">
-                <div className="max-w-[50%] rounded-2xl border border-white/20 bg-white/15 backdrop-blur-xl shadow-xl text-white px-4 py-3">
+                <div className="max-w-[50%] rounded-2xl border border-white/20 bg-white/5 shadow-xl text-white px-4 py-3">
                   <div className="text-[11px] opacity-70 mb-1 text-right">You</div>
                   <p className="whitespace-pre-wrap leading-relaxed text-right">{userLocked}</p>
                 </div>
@@ -434,11 +435,23 @@ export default function ChattingPage() {
             )}
 
             {/* AI bubble (below) */}
-            {aiReply && (
+            {(aiReply || isLoadingReply) && (
               <div className="flex justify-start">
-                <div className="max-w-[50%] rounded-2xl border border-white/20 backdrop-blur-xl shadow-xl text-white px-6 py-4 bg-gradient-to-br from-white/20 via-white/10 to-transparent">
+                <div className="max-w-[50%] rounded-2xl border border-white/20 bg-white/5 shadow-xl text-white px-6 py-4">
                   <div className="text-xs opacity-70 mb-2">AI — {name || "Assistant"}</div>
-                  <p className="whitespace-pre-wrap leading-relaxed">{aiReply}</p>
+                  {isLoadingReply ? (
+                    <div className="flex items-center gap-2">
+                      {[0, 1, 2].map((i) => (
+                        <span
+                          key={i}
+                          className="h-2.5 w-2.5 rounded-full bg-white/85 animate-bounce"
+                          style={{ animationDelay: `${i * 0.18}s` }}
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="whitespace-pre-wrap leading-relaxed">{aiReply}</p>
+                  )}
                 </div>
               </div>
             )}
