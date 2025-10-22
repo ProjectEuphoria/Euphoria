@@ -47,42 +47,15 @@ const PERSONA_DETAILS: Record<string, { accent: string; glow: string; tagline: s
   },
 };
 
-// Browsers expose different voice names; update these per deployment.
-// When none of the preferred voices are available, we fall back to the first voice.
-const PERSONA_VOICE_MAP: Record<
-  string,
-  {
-    names: string[];
-    rate: number;
-    pitch: number;
+function base64ToBlob(base64: string, contentType: string) {
+  const byteCharacters = atob(base64);
+  const byteNumbers = new Array(byteCharacters.length);
+  for (let i = 0; i < byteCharacters.length; i++) {
+    byteNumbers[i] = byteCharacters.charCodeAt(i);
   }
-> = {
-  helena: {
-    names: ["Google en-GB-Wavenet-A", "Google UK English Female", "Google UK English"],
-    rate: 0.94,
-    pitch: 1.12,
-  },
-  milo: {
-    names: ["Google en-US-Wavenet-B", "Google US English Male", "Google US English"],
-    rate: 1.12,
-    pitch: 1.12,
-  },
-  kai: {
-    names: ["Google en-US-Wavenet-D", "Google UK English Male", "Google US English Male"],
-    rate: 0.97,
-    pitch: 0.95,
-  },
-  sophie: {
-    names: ["Google en-US-Wavenet-F", "Google US English Female", "Google US English"],
-    rate: 1.12,
-    pitch: 1.32,
-  },
-  luna: {
-    names: ["Google en-US-Wavenet-G", "Google US English Female", "Google UK English Female"],
-    rate: 1.07,
-    pitch: 1.28,
-  },
-};
+  const byteArray = new Uint8Array(byteNumbers);
+  return new Blob([byteArray], { type: contentType });
+}
 
 export default function ChattingPage() {
   const { name = "" } = useParams<{ name: string }>();
@@ -98,9 +71,10 @@ export default function ChattingPage() {
   const recognitionRef = useRef<any>(null);
   const controllerRef = useRef<AbortController | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
-  const voicesRef = useRef<SpeechSynthesisVoice[]>([]);
-  const pendingSpeechRef = useRef<string>("");
-  const lastSynthTextRef = useRef<string>("");
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioUrlRef = useRef<string>("");
+  const ttsAbortRef = useRef<AbortController | null>(null);
+  const mutedRef = useRef(muted);
 
   // Optional voice input
   useEffect(() => {
@@ -123,74 +97,40 @@ export default function ChattingPage() {
   }, []);
 
   useEffect(() => {
-    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
-    const synth = window.speechSynthesis;
-
-    const loadVoices = () => {
-      const available = synth.getVoices();
-      if (available.length) {
-        voicesRef.current = available;
-      }
-    };
-
-    loadVoices();
-    const canUseEvents = typeof synth.addEventListener === "function";
-    let previousHandler: (typeof synth)["onvoiceschanged"] | undefined;
-
-    if (canUseEvents) {
-      synth.addEventListener("voiceschanged", loadVoices);
-    } else {
-      previousHandler = synth.onvoiceschanged;
-      synth.onvoiceschanged = (event: Event) => {
-        loadVoices();
-        previousHandler?.call(synth, event);
-      };
-    }
+    const audio = new Audio();
+    audio.muted = muted;
+    audioRef.current = audio;
 
     return () => {
-      if (canUseEvents) {
-        synth.removeEventListener?.("voiceschanged", loadVoices);
-      } else if (previousHandler !== undefined) {
-        synth.onvoiceschanged = previousHandler ?? null;
+      audio.pause();
+      audio.src = "";
+      audioRef.current = null;
+      if (audioUrlRef.current) {
+        URL.revokeObjectURL(audioUrlRef.current);
+        audioUrlRef.current = "";
       }
     };
   }, []);
 
-  function speakWithPersona(text: string, personaKey: string) {
-    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
-    const synth = window.speechSynthesis;
-    const voices = synth.getVoices();
-    if (voices.length) {
-      voicesRef.current = voices;
-    }
-
-    const lower = personaKey.toLowerCase();
-    const personaVoice = PERSONA_VOICE_MAP[lower];
-
-    if (!voicesRef.current.length) {
-      pendingSpeechRef.current = text;
-      synth.cancel();
+  useEffect(() => {
+    if (!audioRef.current) return;
+    audioRef.current.muted = muted;
+    if (muted) {
+      audioRef.current.pause();
       return;
     }
-
-    let selectedVoice: SpeechSynthesisVoice | undefined;
-    if (personaVoice) {
-      const preferredNames = personaVoice.names.map((value) => value.toLowerCase());
-      selectedVoice = voicesRef.current.find((voice) =>
-        preferredNames.includes(voice.name.toLowerCase()),
-      );
+    if (audioRef.current.src) {
+      void audioRef.current
+        .play()
+        .catch(() => {
+          /* ignore autoplay errors */
+        });
     }
+  }, [muted]);
 
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.voice = selectedVoice ?? voicesRef.current[0];
-    utterance.rate = personaVoice?.rate ?? 1;
-    utterance.pitch = personaVoice?.pitch ?? 1;
-
-    synth.cancel();
-    synth.speak(utterance);
-    lastSynthTextRef.current = text;
-  }
-
+  useEffect(() => {
+    mutedRef.current = muted;
+  }, [muted]);
 
   // Keep the scroll pinned to the bottom of the messages div
   useEffect(() => {
@@ -200,22 +140,19 @@ export default function ChattingPage() {
   useEffect(() => {
     setPanelOpen(false);
     controllerRef.current?.abort();
+    ttsAbortRef.current?.abort();
     setSending(false);
     setUserLocked("");
     setAiReply("");
     setInput("");
-    pendingSpeechRef.current = "";
-    lastSynthTextRef.current = "";
-    if (typeof window !== "undefined" && "speechSynthesis" in window) {
-      window.speechSynthesis.cancel();
-    }
+    stopAudio();
   }, [name]);
 
   useEffect(() => {
     return () => {
-      if (typeof window !== "undefined" && "speechSynthesis" in window) {
-        window.speechSynthesis.cancel();
-      }
+      controllerRef.current?.abort();
+      ttsAbortRef.current?.abort();
+      stopAudio();
     };
   }, []);
 
@@ -224,36 +161,74 @@ export default function ChattingPage() {
   const isKnownPersona = allBots.some((bot) => bot.toLowerCase() === normalizedName);
   const otherBots = allBots.filter((bot) => bot.toLowerCase() !== normalizedName);
   const bgImg = PERSONA_BACKGROUNDS[normalizedName];
+  const canonicalPersona = allBots.find((bot) => bot.toLowerCase() === normalizedName) ?? allBots[0];
+
+  const stopAudio = () => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.src = "";
+    }
+    if (audioUrlRef.current) {
+      URL.revokeObjectURL(audioUrlRef.current);
+      audioUrlRef.current = "";
+    }
+  };
 
   useEffect(() => {
-    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+    if (!audioRef.current) return;
     const trimmed = aiReply.trim();
-    const synth = window.speechSynthesis;
-
     if (!trimmed || trimmed === "…" || trimmed.startsWith("⚠️") || !isKnownPersona) {
-      pendingSpeechRef.current = "";
-      lastSynthTextRef.current = "";
-      synth.cancel();
+      stopAudio();
       return;
     }
 
-    pendingSpeechRef.current = trimmed;
-    if (muted) return;
-    if (trimmed === lastSynthTextRef.current) return;
+    const controller = new AbortController();
+    ttsAbortRef.current?.abort();
+    ttsAbortRef.current = controller;
 
-    speakWithPersona(trimmed, normalizedName);
-  }, [aiReply, muted, normalizedName, isKnownPersona]);
+    (async () => {
+      try {
+        const res = await fetch("/adk/api/tts", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ persona: canonicalPersona, text: trimmed }),
+          signal: controller.signal,
+        });
+        if (!res.ok) {
+          const errText = await res.text();
+          throw new Error(errText || `Polly request failed with ${res.status}`);
+        }
+        const payload = await res.json();
+        if (!payload?.audio || typeof payload.audio !== "string") {
+          throw new Error("TTS response missing audio data");
+        }
+        const blob = base64ToBlob(payload.audio, payload.contentType ?? "audio/mpeg");
+        const url = URL.createObjectURL(blob);
 
-  useEffect(() => {
-    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
-    if (muted) {
-      window.speechSynthesis.cancel();
-      return;
-    }
-    const pending = pendingSpeechRef.current;
-    if (!pending || pending === lastSynthTextRef.current || !isKnownPersona) return;
-    speakWithPersona(pending, normalizedName);
-  }, [muted, normalizedName, isKnownPersona]);
+        stopAudio();
+        audioUrlRef.current = url;
+        audioRef.current.src = url;
+        audioRef.current.currentTime = 0;
+        if (!mutedRef.current) {
+          await audioRef.current
+            .play()
+            .catch(() => {
+              /* ignore autoplay errors */
+            });
+        }
+      } catch (error) {
+        if (!controller.signal.aborted) {
+          console.error("Polly synthesis failed", error);
+        }
+        stopAudio();
+      }
+    })();
+
+    return () => {
+      controller.abort();
+    };
+  }, [aiReply, name, isKnownPersona]);
 
   if (name && !isKnownPersona) {
     return <Navigate to="/" replace />;
@@ -319,11 +294,8 @@ export default function ChattingPage() {
     setUserLocked("");
     setAiReply("");
     setInput("");
-    pendingSpeechRef.current = "";
-    lastSynthTextRef.current = "";
-    if (typeof window !== "undefined" && "speechSynthesis" in window) {
-      window.speechSynthesis.cancel();
-    }
+    ttsAbortRef.current?.abort();
+    stopAudio();
   }
 
   return (

@@ -1,0 +1,52 @@
+{
+  "persona": "Milo",
+  "baseVoice": "Matthew",
+  "engine": "neural",
+  "applied": {
+    "ssmlProsody": false,
+    "pollyNeural": true,
+    "dspPost": false
+  },
+  "generative": {
+    "pitchSemitones": -0.7,
+    "ratePct": -3,
+    "eq": {
+      "lowShelfDb": 1,
+      "presenceDb": 0.7,
+      "airDb": 0.3
+    },
+    "reverb": {
+      "mix": 0.02,
+      "predelayMs": 6,
+      "room": "booth"
+    },
+    "breath": {
+      "prob": 0.08,
+      "type": "half-chuckle",
+      "maxPerUtterance": 1
+    },
+    "prosody": {
+      "defaultContour": "grounded",
+      "pauseMs": {
+        "comma": 85,
+        "period": 150,
+        "paragraph": 260
+      },
+      "emphasis": {
+        "liftDb": 1,
+        "tilt": "slight-down"
+      }
+    }
+  },
+  "request": {},
+  "analysis": {
+    "durationMs": 15072,
+    "approxSpeechRate": 2.1231422505307855,
+    "meanVolumeDb": -24.3
+  },
+  "cache": {
+    "key": "7b0dbf86f257748570d5d9e4a2ad2a2e059b0931",
+    "hit": false,
+    "expiresAt": 1763705801643
+  }
+}

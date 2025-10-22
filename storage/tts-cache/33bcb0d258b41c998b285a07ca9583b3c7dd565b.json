@@ -1,0 +1,52 @@
+{
+  "persona": "Helena",
+  "baseVoice": "Salli",
+  "engine": "neural",
+  "applied": {
+    "ssmlProsody": false,
+    "pollyNeural": true,
+    "dspPost": false
+  },
+  "generative": {
+    "pitchSemitones": -0.4,
+    "ratePct": 5,
+    "eq": {
+      "lowShelfDb": 0.5,
+      "presenceDb": 1.2,
+      "airDb": 0.6
+    },
+    "reverb": {
+      "mix": 0.03,
+      "predelayMs": 8,
+      "room": "studio"
+    },
+    "breath": {
+      "prob": 0.02,
+      "type": "dry",
+      "maxPerUtterance": 1
+    },
+    "prosody": {
+      "defaultContour": "composed",
+      "pauseMs": {
+        "comma": 70,
+        "period": 140,
+        "paragraph": 240
+      },
+      "emphasis": {
+        "liftDb": 1.2,
+        "tilt": "flat"
+      }
+    }
+  },
+  "request": {},
+  "analysis": {
+    "durationMs": 3360,
+    "approxSpeechRate": 2.380952380952381,
+    "meanVolumeDb": -24.2
+  },
+  "cache": {
+    "key": "33bcb0d258b41c998b285a07ca9583b3c7dd565b",
+    "hit": false,
+    "expiresAt": 1763705776913
+  }
+}

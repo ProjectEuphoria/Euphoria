@@ -11,6 +11,7 @@ import signupRoute from "./auth/signup.js";
 import signinRoute from "./auth/signin.js";
 import { authCheckRoute } from "./auth/check.js";
 import { logoutRoute } from "./auth/logout.js";
+import ttsRoute from "./tts/route.js";
 
 dotenv.config();
 
@@ -44,6 +45,7 @@ await app.register(signupRoute, { prefix: "/adk/api" });
 await app.register(signinRoute, { prefix: "/adk/api" });
 await app.register(authCheckRoute, { prefix: "/adk/api" });
 await app.register(logoutRoute, { prefix: "/adk/api" });
+await app.register(ttsRoute, { prefix: "/adk/api" });
 
 
 // ----------------------------------------------------------
