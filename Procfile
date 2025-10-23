@@ -1,1 +1,1 @@
-web: node dist/api/http.server.js
+web: npm start
