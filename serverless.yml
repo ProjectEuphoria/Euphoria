@@ -1,0 +1,31 @@
+service: euphoria
+
+provider:
+  name: aws
+  runtime: nodejs20.x
+  region: ap-south-1
+  environment:
+    GOOGLE_API_KEY: ${env:GOOGLE_API_KEY, 'AIzaSyAFxGi7YbuHs2QVmDYZ5zhKvHPp50PpBmg'}
+    COOKIE_SECRET: ${env:COOKIE_SECRET, '86bc0d7e213a6f0ef3ab7c0cff2eefa9abb4fb8355e3df01'}
+    NODE_ENV: production
+    AWS_REGION: ap-south-1
+    HELENA_TOKEN: ${env:HELENA_TOKEN, '8238166446:AAHcG814F9TYWns1IbUj28BUNi9X5mZURKw'}
+    LUNA_TOKEN: ${env:LUNA_TOKEN, '8199799409:AAFGKaMPv3u1iS03ZxpOPzUk-BeVSulp4Vo'}
+    MILO_TOKEN: ${env:MILO_TOKEN, '8036814331:AAEkQdr23HG3c2N_IrsiECOrPCpTGtpJdQI'}
+    KAI_TOKEN: ${env:KAI_TOKEN, '8442144710:AAHbMqB6fRcr5yC_zTZ8biak5XjckeLKTMk'}
+    SOPHIE_TOKEN: ${env:SOPHIE_TOKEN, '8368727385:AAE25u-fwsQAOGyT1plLqWVzwDLcvsUNd6Y'}
+
+functions:
+  app:
+    handler: dist/lambda.handler
+    events:
+      - httpApi: '*'
+    timeout: 30
+    memorySize: 512
+
+package:
+  patterns:
+    - '!src/**'
+    - '!node_modules/**'
+    - 'dist/**'
+    - 'package.json'

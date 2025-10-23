@@ -22,16 +22,26 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// trustProxy = true because EB sits behind nginx / ALB
+// EB is behind nginx/ALB → trust proxy headers
 const app = Fastify({ logger: true, trustProxy: true });
 
-// Log route registration (for debugging)
-app.addHook("onRoute", (route) => {
-  app.log.info(`📡 Registered route: [${route.method}] ${route.url}`);
+// Crash guards so background errors never kill the process
+process.on("unhandledRejection", (err: any) => {
+  app.log.error({ err }, "unhandledRejection");
+});
+process.on("uncaughtException", (err: any) => {
+  app.log.error({ err }, "uncaughtException");
 });
 
-// Normalize CORS origins
-const rawOrigins = process.env.CORS_ORIGINS;
+// Log route registration (handy on EB)
+app.addHook("onRoute", (route) => {
+  app.log.info(`📡 [${route.method}] ${route.url}`);
+});
+
+// ----------------------------------------------------------
+// 🧩 CORS & Cookies
+// ----------------------------------------------------------
+const rawOrigins = process.env.CORS_ORIGINS; // comma-separated
 let allowedOrigins = (rawOrigins
   ? rawOrigins.split(",").map((o) => o.trim())
   : ["http://localhost:5173", "http://127.0.0.1:5173"]
@@ -39,27 +49,43 @@ let allowedOrigins = (rawOrigins
   .map((o) => o.replace(/\/$/, ""))
   .filter(Boolean);
 
-// In production, automatically allow the EB hostname if not explicitly set
+// In production, if not provided, allow EB hostname(s)
 if (process.env.NODE_ENV === "production" && !rawOrigins) {
-  allowedOrigins = ["*"]; // easiest; or restrict below:
-  // const ebHost = process.env.EB_HOSTNAME; // optionally set via env
-  // if (ebHost) allowedOrigins.push(`https://${ebHost}`, `http://${ebHost}`);
+  // You can restrict instead of wildcard by setting EB_HOSTNAME
+  const ebHost = process.env.EB_HOSTNAME; // e.g. euphoria-prod.eba-xxxx.ap-south-1.elasticbeanstalk.com
+  if (ebHost) {
+    allowedOrigins.push(`https://${ebHost}`, `http://${ebHost}`);
+  } else {
+    // allow *.elasticbeanstalk.com by default
+    allowedOrigins.push("elasticbeanstalk:*");
+  }
 }
 
-// ----------------------------------------------------------
-// 🧩 Plugins
-// ----------------------------------------------------------
+function isAllowedOrigin(origin: string) {
+  if (allowedOrigins.includes("*")) return true;
+  const normalized = origin.replace(/\/$/, "");
+  if (allowedOrigins.includes(normalized)) return true;
+
+  // Safely parse to get hostname (avoid throwing on non-absolute origins)
+  try {
+    const u = new URL(normalized);
+    const host = u.hostname || "";
+    if (
+      allowedOrigins.includes("elasticbeanstalk:*") &&
+      /\.elasticbeanstalk\.com$/i.test(host)
+    ) {
+      return true;
+    }
+  } catch {
+    // ignore
+  }
+  return false;
+}
+
 await app.register(cors, {
   origin(origin, cb) {
-    if (!origin) return cb(null, true);
-    const normalized = origin.replace(/\/$/, "");
-    if (
-      allowedOrigins.includes("*") ||
-      allowedOrigins.includes(normalized) ||
-      /\.elasticbeanstalk\.com$/.test(new URL(normalized).hostname)
-    ) {
-      return cb(null, true);
-    }
+    if (!origin) return cb(null, true); // same-origin or non-browser
+    if (isAllowedOrigin(origin)) return cb(null, true);
     cb(new Error(`Origin ${origin} is not allowed by CORS policy`), false);
   },
   credentials: true,
@@ -67,11 +93,8 @@ await app.register(cors, {
 
 const cookieSecret = process.env.COOKIE_SECRET || "replace-me";
 if (!process.env.COOKIE_SECRET) {
-  app.log.warn(
-    "COOKIE_SECRET is not set; using an insecure default. Set COOKIE_SECRET in production."
-  );
+  app.log.warn("COOKIE_SECRET missing; using insecure default. Set it on EB.");
 }
-
 await app.register(cookie, { secret: cookieSecret });
 
 // Optional edge auth for /adk/*
@@ -87,7 +110,7 @@ if (edgeSecret) {
 }
 
 // ----------------------------------------------------------
-// 🔐 Auth + TTS routes
+// 🔐 API Routes
 // ----------------------------------------------------------
 await app.register(signupRoute, { prefix: "/adk/api" });
 await app.register(signinRoute, { prefix: "/adk/api" });
@@ -105,15 +128,11 @@ app.post<{
   try {
     const { name } = req.params;
     const { input } = req.body ?? {};
-    app.log.info(`💬 Chat request to agent "${name}" with input: ${input}`);
-
     if (!input || typeof input !== "string") {
       return reply.code(400).send({ error: 'Missing "input" string in body' });
     }
-
     const runner = await makeRunnerByName(name);
     if (!runner?.ask) throw new Error(`Runner for ${name} has no "ask"`);
-
     const out = await runner.ask(input);
     return { reply: typeof out === "string" ? out : String(out) };
   } catch (err: any) {
@@ -123,11 +142,10 @@ app.post<{
 });
 
 // ----------------------------------------------------------
-// 🧱 Serve Frontend in Production (Vite build)
+// 🧱 Static UI (Vite build) — enabled in production
 // ----------------------------------------------------------
 if (process.env.NODE_ENV === "production") {
-  // At runtime __dirname === "<project-root>/dist/api"
-  // So "../../dist" resolves back to "<project-root>/dist"
+  // Runtime __dirname ≈ "<root>/dist/api" → UI at "../../dist"
   const uiDir = path.resolve(__dirname, "../../dist");
 
   await app.register(fastifyStatic, {
@@ -136,7 +154,7 @@ if (process.env.NODE_ENV === "production") {
     index: "index.html",
   });
 
-  // SPA fallback: any GET asking for HTML returns index.html
+  // SPA fallback: serve index.html for unknown GETs that accept HTML
   app.setNotFoundHandler((req, reply) => {
     const accept = req.headers.accept || "";
     if (req.raw.method === "GET" && accept.includes("text/html")) {
@@ -147,21 +165,27 @@ if (process.env.NODE_ENV === "production") {
 }
 
 // ----------------------------------------------------------
-// 🩺 Health
+// 🩺 Health & Version
 // ----------------------------------------------------------
-app.get("/health", async () => ({ ok: true }));
+app.get("/health", async () => ({ ok: true, ts: Date.now() }));
+app.get("/version", async () => ({
+  version: process.env.APP_VERSION || "unknown",
+  node: process.version,
+  env: process.env.NODE_ENV,
+}));
 
 // ----------------------------------------------------------
-// ⚡ Warm-up
+// ⚡ Warm-up (non-blocking on EB)
 // ----------------------------------------------------------
-await prewarmRunners(["Helena"]);
+prewarmRunners(["Helena"])
+  .then(() => app.log.info("Runners prewarmed"))
+  .catch((e) => app.log.warn({ err: e }, "prewarmRunners failed"));
 
 // ----------------------------------------------------------
-// 🚀 Startup (EB-safe: uses EB's injected PORT & 0.0.0.0)
+// 🚀 Startup (EB injects PORT; bind 0.0.0.0)
 // ----------------------------------------------------------
 app.addHook("onReady", async () => {
-  console.log("✅ Fastify middleware & routes fully loaded");
-  console.log("📍 Routes registered:");
+  app.log.info("✅ Fastify ready; routes below");
   app.printRoutes();
 });
 
@@ -170,10 +194,27 @@ const HOST = "0.0.0.0";
 
 try {
   await app.listen({ port: PORT, host: HOST });
-  app.log.info(
-    `🔥 ADK server running on :${PORT} (host=${HOST}, env=${process.env.NODE_ENV})`
-  );
+  app.log.info(`🔥 Server on :${PORT} (env=${process.env.NODE_ENV})`);
 } catch (err) {
-  app.log.error(err);
+  app.log.error({ err }, "Failed to start server");
   process.exit(1);
 }
+
+// ----------------------------------------------------------
+// 🧹 Graceful shutdown on EB stop
+// ----------------------------------------------------------
+for (const sig of ["SIGINT", "SIGTERM"] as const) {
+  process.on(sig, async () => {
+    app.log.info({ sig }, "Shutting down...");
+    try {
+      await app.close();
+      process.exit(0);
+    } catch (e) {
+      app.log.error({ e }, "Error during shutdown");
+      process.exit(1);
+    }
+  });
+}
+
+// Export app for Lambda
+export { app };

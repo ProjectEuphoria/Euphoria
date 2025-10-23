@@ -3,6 +3,10 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "engines": {
+    "node": "18.x",
+    "npm": "9.x"
+  },
   "scripts": {
     "dev": "concurrently -k -n UI,API -c cyan,magenta \"vite\" \"tsx src/api/http.server.ts\"",
     "build": "npm run build:client && npm run build:server",
@@ -11,7 +15,7 @@
     "cli": "tsx src/cli.ts",
     "once": "tsx src/once.ts",
     "build:client": "vite build",
-    "build:server": "tsup src/api/http.server.ts --format esm --splitting=false --minify --out-dir dist/api --clean=false"
+    "build:server": "tsup"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^2.0.23",
@@ -19,9 +23,10 @@
     "@ai-sdk/openai": "^2.0.42",
     "@aws-sdk/client-polly": "^3.744.0",
     "@aws-sdk/credential-providers": "^3.744.0",
+    "@fastify/aws-lambda": "^6.1.1",
     "@fastify/cookie": "^11.0.2",
     "@fastify/cors": "11.1.0",
-    "@fastify/static": "^6.12.0",
+    "@fastify/static": "^7.0.4",
     "@iqai/adk": "^0.3.7",
     "@modelcontextprotocol/sdk": "^1.20.0",
     "@tailwindcss/vite": "^4.1.14",

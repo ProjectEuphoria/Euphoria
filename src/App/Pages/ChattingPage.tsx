@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, ChevronLeft, ChevronRight, Sparkles, Volume2, VolumeX } from "lucide-react";
 import { buildChatUrl } from "../../utils/url";
+import { API_BASE_URL } from "../../config/api";
 import helenaImg from "../../assets/give a good anime background which is subjected to no copyright.jpg";
 import miloImg from "../../assets/Milo_bg.jpg";
 import sophieImg from "../../assets/Sophie_bg.jpg";
@@ -392,7 +393,7 @@ export default function ChattingPage() {
       try {
         const sanitizedText = sanitizeForSpeech(trimmed);
         const payloadText = sanitizedText.length ? sanitizedText : trimmed;
-        const res = await fetch("/adk/api/tts", {
+        const res = await fetch(`${API_BASE_URL}/api/tts`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
@@ -481,10 +482,10 @@ export default function ChattingPage() {
     setTtsPending(false);
 
     try {
-      const res = await fetch(`/adk/agents/${name}/ask`, {
+      const res = await fetch(`${API_BASE_URL}/api/chat/${name}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ input: msg }),
+        body: JSON.stringify({ message: msg }),
         signal: controllerRef.current.signal,
       });
 
@@ -497,12 +498,12 @@ export default function ChattingPage() {
         throw new Error(`/${name}/ask ${res.status}: ${errText}`);
       }
 
-      const data: AskResponse = isJson ? await res.json() : { reply: await res.text() };
+      const data = isJson ? await res.json() : { response: await res.text() };
       setTtsPending(true);
       setSpeechMarks([]);
       setRenderedReply("");
       setStreaming(false);
-      setAiReply(String(data.reply ?? ""));
+      setAiReply(String(data.response ?? ""));
     } catch (e: any) {
       if (e?.name !== "AbortError") {
         const message = `⚠️ ${e?.message ?? String(e)}`;

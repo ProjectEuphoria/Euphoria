@@ -1,0 +1,76 @@
+{
+  "/home/kali/Desktop/project EMPARIO/Euphoria/serverless.yml": {
+    "versionFramework": "4.22.0",
+    "servicePath": "/home/kali/Desktop/project EMPARIO/Euphoria/serverless.yml",
+    "serviceConfigFileName": "serverless.yml",
+    "service": {
+      "service": "euphoria",
+      "provider": {
+        "name": "aws",
+        "runtime": "nodejs20.x",
+        "region": "ap-south-1",
+        "environment": {
+          "GOOGLE_API_KEY": "<REDACTED>",
+          "COOKIE_SECRET": "<REDACTED>",
+          "NODE_ENV": "production",
+          "AWS_REGION": "ap-south-1",
+          "HELENA_TOKEN": "<REDACTED>",
+          "LUNA_TOKEN": "<REDACTED>",
+          "MILO_TOKEN": "<REDACTED>",
+          "KAI_TOKEN": "<REDACTED>",
+          "SOPHIE_TOKEN": "<REDACTED>"
+        }
+      },
+      "functions": {
+        "app": {
+          "handler": "dist/lambda.handler",
+          "events": [
+            {
+              "httpApi": "*"
+            }
+          ],
+          "timeout": 30,
+          "memorySize": 512
+        }
+      },
+      "package": {
+        "patterns": [
+          "!src/**",
+          "!node_modules/**",
+          "dist/**",
+          "package.json"
+        ]
+      }
+    },
+    "provider": {
+      "name": "aws",
+      "runtime": "nodejs20.x",
+      "region": "ap-south-1",
+      "environment": {
+        "GOOGLE_API_KEY": "<REDACTED>",
+        "COOKIE_SECRET": "<REDACTED>",
+        "NODE_ENV": "production",
+        "AWS_REGION": "ap-south-1",
+        "HELENA_TOKEN": "<REDACTED>",
+        "LUNA_TOKEN": "<REDACTED>",
+        "MILO_TOKEN": "<REDACTED>",
+        "KAI_TOKEN": "<REDACTED>",
+        "SOPHIE_TOKEN": "<REDACTED>"
+      }
+    },
+    "error": {
+      "message": "You must sign in or use a license key with Serverless Framework V.4 and later versions. Please use \"serverless login\".",
+      "stack": "Error: You must sign in or use a license key with Serverless Framework V.4 and later versions. Please use \"serverless login\".\n    at Authentication.getAuthenticatedData (file:///home/kali/.serverless/releases/4.22.0/package/dist/sf-core.js:717:11064)\n    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at async Authentication.authenticate (file:///home/kali/.serverless/releases/4.22.0/package/dist/sf-core.js:719:22222)\n    at async TraditionalRunner.resolveVariablesAndAuthenticate (file:///home/kali/.serverless/releases/4.22.0/package/dist/sf-core.js:726:1266)\n    at async TraditionalRunner.run (file:///home/kali/.serverless/releases/4.22.0/package/dist/sf-core.js:1353:27914)\n    at async route (file:///home/kali/.serverless/releases/4.22.0/package/dist/sf-core.js:1528:2878)\n    at async Object.run (file:///home/kali/.serverless/releases/4.22.0/package/dist/sf-core.js:1529:3755)\n    at async run2 (file:///home/kali/.serverless/releases/4.22.0/package/dist/sf-core.js:1529:4909)"
+    },
+    "serviceRawFile": "service: euphoria\n\nprovider:\n  name: aws\n  runtime: nodejs20.x\n  region: ap-south-1\n  environment:\n    GOOGLE_API_KEY: ${env:GOOGLE_API_KEY, 'AIzaSyAFxGi7YbuHs2QVmDYZ5zhKvHPp50PpBmg'}\n    COOKIE_SECRET: ${env:COOKIE_SECRET, '86bc0d7e213a6f0ef3ab7c0cff2eefa9abb4fb8355e3df01'}\n    NODE_ENV: production\n    AWS_REGION: ap-south-1\n    HELENA_TOKEN: ${env:HELENA_TOKEN, '8238166446:AAHcG814F9TYWns1IbUj28BUNi9X5mZURKw'}\n    LUNA_TOKEN: ${env:LUNA_TOKEN, '8199799409:AAFGKaMPv3u1iS03ZxpOPzUk-BeVSulp4Vo'}\n    MILO_TOKEN: ${env:MILO_TOKEN, '8036814331:AAEkQdr23HG3c2N_IrsiECOrPCpTGtpJdQI'}\n    KAI_TOKEN: ${env:KAI_TOKEN, '8442144710:AAHbMqB6fRcr5yC_zTZ8biak5XjckeLKTMk'}\n    SOPHIE_TOKEN: ${env:SOPHIE_TOKEN, '8368727385:AAE25u-fwsQAOGyT1plLqWVzwDLcvsUNd6Y'}\n\nfunctions:\n  app:\n    handler: dist/lambda.handler\n    events:\n      - httpApi: '*'\n    timeout: 30\n    memorySize: 512\n\npackage:\n  patterns:\n    - '!src/**'\n    - '!node_modules/**'\n    - 'dist/**'\n    - 'package.json'\n",
+    "command": [
+      "deploy"
+    ],
+    "options": {},
+    "serviceProviderAwsCfStackId": null,
+    "serviceProviderAwsCfStackCreated": null,
+    "serviceProviderAwsCfStackUpdated": null,
+    "serviceProviderAwsCfStackStatus": null,
+    "serviceProviderAwsCfStackOutputs": null
+  }
+}

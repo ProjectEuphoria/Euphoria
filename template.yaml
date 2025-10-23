@@ -1,0 +1,41 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+
+Globals:
+  Function:
+    Timeout: 30
+    MemorySize: 512
+    Runtime: nodejs20.x
+
+Resources:
+  EuphoriaFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: .
+      Handler: dist/lambda.handler
+      Events:
+        Api:
+          Type: HttpApi
+          Properties:
+            Path: /{proxy+}
+            Method: ANY
+        Root:
+          Type: HttpApi
+          Properties:
+            Path: /
+            Method: ANY
+      Environment:
+        Variables:
+          NODE_ENV: production
+          GOOGLE_API_KEY: AIzaSyAFxGi7YbuHs2QVmDYZ5zhKvHPp50PpBmg
+          COOKIE_SECRET: 86bc0d7e213a6f0ef3ab7c0cff2eefa9abb4fb8355e3df01
+          HELENA_TOKEN: 8238166446:AAHcG814F9TYWns1IbUj28BUNi9X5mZURKw
+          LUNA_TOKEN: 8199799409:AAFGKaMPv3u1iS03ZxpOPzUk-BeVSulp4Vo
+          MILO_TOKEN: 8036814331:AAEkQdr23HG3c2N_IrsiECOrPCpTGtpJdQI
+          KAI_TOKEN: 8442144710:AAHbMqB6fRcr5yC_zTZ8biak5XjckeLKTMk
+          SOPHIE_TOKEN: 8368727385:AAE25u-fwsQAOGyT1plLqWVzwDLcvsUNd6Y
+
+Outputs:
+  EuphoriaApi:
+    Description: "API Gateway endpoint URL"
+    Value: !Sub "https://${ServerlessHttpApi}.execute-api.${AWS::Region}.amazonaws.com/"

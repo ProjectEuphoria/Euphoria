@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Mail, Lock, Eye, EyeOff, ArrowRight, Shield, UserPlus, LogIn, Sparkles } from "lucide-react";
 import LiquidEther from "../../Components/Effects/LiquidEther";
 import {useNavigate } from "react-router-dom";
+import { API_BASE_URL } from "../../config/api";
 
 
 const panelVariants = {
@@ -99,12 +100,12 @@ export default function ModernAuthUI() {
       setLoading(true);
       const payload = isSignIn ? { email, password } : { email, password, displayName };
 
-      const res = isSignIn ? await fetch("/adk/api/auth/signin", {
+      const res = isSignIn ? await fetch(`${API_BASE_URL}/api/auth/signin`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify(payload)
-      }) : await fetch("/adk/api/auth/signup", {
+      }) : await fetch(`${API_BASE_URL}/api/auth/signup`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
