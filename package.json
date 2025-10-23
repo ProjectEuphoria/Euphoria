@@ -5,15 +5,13 @@
   "type": "module",
   "scripts": {
     "dev": "concurrently -k -n UI,API -c cyan,magenta \"vite\" \"tsx src/api/http.server.ts\"",
-    "build": "vite build && tsup src/api/http.server.ts --out-dir dist/api --format esm --target node22 --clean",
-    "start": "NODE_ENV=production node dist/api/http.server.js",
+    "build": "npm run build:client && npm run build:server",
+    "start": "node dist/api/http.server.js",
     "preview": "vite preview",
     "cli": "tsx src/cli.ts",
     "once": "tsx src/once.ts",
     "build:client": "vite build",
-    "build:server": "tsc -p tsconfig.json",
-    "build": "npm run build:client && npm run build:server",
-    "start": "node dist/api/http.server.js"
+    "build:server": "tsup src/api/http.server.ts --format esm --splitting=false --minify --out-dir dist/api --clean=false"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^2.0.23",
@@ -51,7 +49,6 @@
     "telegraf": "^4.16.3",
     "three": "^0.180.0",
     "tmp-promise": "^3.0.3",
-    "tsup": "^8.1.0",
     "tsx": "^4.19.0",
     "zod": "^3.24.0"
   },
@@ -59,21 +56,22 @@
     "@eslint/js": "^9.36.0",
     "@modelcontextprotocol/server-filesystem": "^2025.8.21",
     "@types/better-sqlite3": "^7.6.13",
-    "@types/node": "^24.6.2",
+    "@types/node": "^24.9.1",
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.2.2",
     "@types/three": "^0.180.0",
-    "@vitejs/plugin-react": "^5.0.3",
+    "@vitejs/plugin-react": "^5.0.4",
     "concurrently": "^9.2.1",
     "eslint": "^9.36.0",
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.20",
     "globals": "^16.4.0",
+    "tsup": "^8.5.0",
     "tsx": "^4.20.6",
     "tw-animate-css": "^1.4.0",
     "typescript": "~5.8.3",
     "typescript-eslint": "^8.44.0",
-    "vite": "^7.1.7"
+    "vite": "^7.1.12"
   },
   "description": "This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.",
   "main": "eslint.config.js",

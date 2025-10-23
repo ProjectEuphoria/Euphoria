@@ -1,3 +1,4 @@
+// src/api/http.server.ts
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import cookie from "@fastify/cookie";
@@ -21,7 +22,8 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const app = Fastify({ logger: true });
+// trustProxy = true because EB sits behind nginx / ALB
+const app = Fastify({ logger: true, trustProxy: true });
 
 // Log route registration (for debugging)
 app.addHook("onRoute", (route) => {
@@ -30,21 +32,32 @@ app.addHook("onRoute", (route) => {
 
 // Normalize CORS origins
 const rawOrigins = process.env.CORS_ORIGINS;
-const allowedOrigins = (rawOrigins
-  ? rawOrigins.split(",").map((origin) => origin.trim())
+let allowedOrigins = (rawOrigins
+  ? rawOrigins.split(",").map((o) => o.trim())
   : ["http://localhost:5173", "http://127.0.0.1:5173"]
 )
-  .map((origin) => origin.replace(/\/$/, ""))
+  .map((o) => o.replace(/\/$/, ""))
   .filter(Boolean);
+
+// In production, automatically allow the EB hostname if not explicitly set
+if (process.env.NODE_ENV === "production" && !rawOrigins) {
+  allowedOrigins = ["*"]; // easiest; or restrict below:
+  // const ebHost = process.env.EB_HOSTNAME; // optionally set via env
+  // if (ebHost) allowedOrigins.push(`https://${ebHost}`, `http://${ebHost}`);
+}
 
 // ----------------------------------------------------------
 // 🧩 Plugins
 // ----------------------------------------------------------
 await app.register(cors, {
   origin(origin, cb) {
-    if (!origin) return cb(null, true); // non-browser or same-origin
+    if (!origin) return cb(null, true);
     const normalized = origin.replace(/\/$/, "");
-    if (allowedOrigins.includes("*") || allowedOrigins.includes(normalized)) {
+    if (
+      allowedOrigins.includes("*") ||
+      allowedOrigins.includes(normalized) ||
+      /\.elasticbeanstalk\.com$/.test(new URL(normalized).hostname)
+    ) {
       return cb(null, true);
     }
     cb(new Error(`Origin ${origin} is not allowed by CORS policy`), false);
@@ -59,9 +72,7 @@ if (!process.env.COOKIE_SECRET) {
   );
 }
 
-await app.register(cookie, {
-  secret: cookieSecret,
-});
+await app.register(cookie, { secret: cookieSecret });
 
 // Optional edge auth for /adk/*
 const edgeSecret = process.env.EDGE_SECRET?.trim();
@@ -115,12 +126,13 @@ app.post<{
 // 🧱 Serve Frontend in Production (Vite build)
 // ----------------------------------------------------------
 if (process.env.NODE_ENV === "production") {
+  // At runtime __dirname === "<project-root>/dist/api"
+  // So "../../dist" resolves back to "<project-root>/dist"
   const uiDir = path.resolve(__dirname, "../../dist");
 
   await app.register(fastifyStatic, {
     root: uiDir,
-    prefix: "/",       // serve at /
-    wildcard: true,    // allow nested paths
+    prefix: "/",
     index: "index.html",
   });
 
@@ -153,12 +165,14 @@ app.addHook("onReady", async () => {
   app.printRoutes();
 });
 
-const PORT = Number(process.env.PORT || process.env.API_PORT || 8080); // EB injects PORT
+const PORT = Number(process.env.PORT || process.env.API_PORT || 8080);
 const HOST = "0.0.0.0";
 
 try {
   await app.listen({ port: PORT, host: HOST });
-  app.log.info(`🔥 ADK server running on :${PORT} (host=${HOST}, env=${process.env.NODE_ENV})`);
+  app.log.info(
+    `🔥 ADK server running on :${PORT} (host=${HOST}, env=${process.env.NODE_ENV})`
+  );
 } catch (err) {
   app.log.error(err);
   process.exit(1);
