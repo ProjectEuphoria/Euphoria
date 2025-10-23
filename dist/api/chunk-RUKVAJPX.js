@@ -583,7 +583,7 @@ async function getWellnessTools() {
     }),
     fn: async ({ startTime, intervalMinutes = 180, count = 3, customTimes }) => {
       let slots = [];
-      if (customTimes == null ? void 0 : customTimes.length) {
+      if (customTimes?.length) {
         slots = customTimes.map(parseISOOrThrow);
       } else {
         const anchor = parseISOOrThrow(startTime);
@@ -903,7 +903,7 @@ async function getWellnessTools() {
     }),
     fn: async ({ entry, promptRequested = false, tags }) => {
       const prompt = promptRequested ? GRATITUDE_PROMPTS[Math.floor(Math.random() * GRATITUDE_PROMPTS.length)] : void 0;
-      const line = `[gratitude] ${entry}${(tags == null ? void 0 : tags.length) ? ` | tags: ${tags.join(", ")}` : ""}`;
+      const line = `[gratitude] ${entry}${tags?.length ? ` | tags: ${tags.join(", ")}` : ""}`;
       const file = await saveJournalEntry(line);
       return {
         savedTo: file,
@@ -1236,8 +1236,8 @@ async function sendTelegramMessage(token, body) {
     body: JSON.stringify(body)
   });
   const payload = await response.json();
-  if (!response.ok || (payload == null ? void 0 : payload.ok) === false) {
-    const description = (payload == null ? void 0 : payload.description) ?? response.statusText;
+  if (!response.ok || payload?.ok === false) {
+    const description = payload?.description ?? response.statusText;
     throw new Error(`Telegram API error: ${description}`);
   }
   return payload;
@@ -1253,7 +1253,6 @@ async function getPersonaTelegramTools() {
       description: `Send a Telegram message as ${bot.name}.` + (defaultChat ? ` Defaults to chat ${defaultChat}.` : " Provide chatId explicitly."),
       schema: messageSchema,
       fn: async ({ chatId, text, parseMode, disableNotification, disableWebPagePreview }) => {
-        var _a, _b, _c;
         const resolvedChat = chatId ?? defaultChat;
         if (!resolvedChat) {
           throw new Error("chatId is required for this bot because no default chat is configured.");
@@ -1268,9 +1267,9 @@ async function getPersonaTelegramTools() {
         const payload = await sendTelegramMessage(token, body);
         return {
           ok: true,
-          chat: ((_a = payload == null ? void 0 : payload.result) == null ? void 0 : _a.chat) ?? null,
-          messageId: ((_b = payload == null ? void 0 : payload.result) == null ? void 0 : _b.message_id) ?? null,
-          date: ((_c = payload == null ? void 0 : payload.result) == null ? void 0 : _c.date) ?? null
+          chat: payload?.result?.chat ?? null,
+          messageId: payload?.result?.message_id ?? null,
+          date: payload?.result?.date ?? null
         };
       }
     });
@@ -1314,7 +1313,7 @@ async function sendDiscordMessage(token, channelId, body) {
   });
   const payload = await response.json().catch(() => void 0);
   if (!response.ok) {
-    const description = (payload == null ? void 0 : payload.message) ?? response.statusText;
+    const description = payload?.message ?? response.statusText;
     throw new Error(`Discord API error: ${description}`);
   }
   return payload;
@@ -1344,8 +1343,8 @@ async function getPersonaDiscordTools() {
         return {
           ok: true,
           channelId: resolvedChannel,
-          messageId: (payload == null ? void 0 : payload.id) ?? null,
-          timestamp: (payload == null ? void 0 : payload.timestamp) ?? null
+          messageId: payload?.id ?? null,
+          timestamp: payload?.timestamp ?? null
         };
       }
     });
@@ -1456,10 +1455,9 @@ async function loadPersonaTools(agentName) {
   if (!agentName) return tools.slice();
   const lowerAgent = agentName.toLowerCase();
   return tools.filter((tool) => {
-    var _a;
-    if (!(tool == null ? void 0 : tool.name)) return true;
+    if (!tool?.name) return true;
     if (tool.name.endsWith("_telegram") || tool.name.endsWith("_discord")) {
-      const persona = (_a = tool.name.split("_")[0]) == null ? void 0 : _a.toLowerCase();
+      const persona = tool.name.split("_")[0]?.toLowerCase();
       return persona === lowerAgent;
     }
     return true;
@@ -1482,7 +1480,7 @@ var DISCORD_HELPERS = {
   luna: "Luna_discord(channelId?, content, tts?, embeds?, threadId?)"
 };
 function getToolUsageGuidance(persona) {
-  const lower = persona == null ? void 0 : persona.toLowerCase();
+  const lower = persona?.toLowerCase();
   const telegramLine = lower && TELEGRAM_HELPERS[lower] ? `Messaging \u2013 Telegram
 - \`${TELEGRAM_HELPERS[lower]}\`: send a Telegram message as your bot. Provide \`chatId\` if no default username is configured.` : "Messaging \u2013 Telegram\n- Dedicated persona tool available (e.g. Helena_telegram).";
   const discordLine = lower && DISCORD_HELPERS[lower] ? `Messaging \u2013 Discord

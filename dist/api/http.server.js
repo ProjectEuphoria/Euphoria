@@ -18,31 +18,31 @@ async function makeRunnerByName(name) {
   if (cache[cacheKey]) return cache[cacheKey];
   switch (name) {
     case "Helena": {
-      const { Helena } = await import("./agent-W5FZIELE.js");
+      const { Helena } = await import("./agent-CW72JOCF.js");
       const built = await Helena();
       cache[cacheKey] = built.runner;
       return cache[cacheKey];
     }
     case "Milo": {
-      const { Milo } = await import("./agent-NI5L3GQS.js");
+      const { Milo } = await import("./agent-44VCPB65.js");
       const built = await Milo();
       cache[cacheKey] = built.runner;
       return cache[cacheKey];
     }
     case "Kai": {
-      const { Kai } = await import("./agent-UFV2VCO2.js");
+      const { Kai } = await import("./agent-SMGOVCNE.js");
       const built = await Kai();
       cache[cacheKey] = built.runner;
       return cache[cacheKey];
     }
     case "Sophie": {
-      const { Sophie } = await import("./agent-PJL547UX.js");
+      const { Sophie } = await import("./agent-AIRJHBPM.js");
       const built = await Sophie();
       cache[cacheKey] = built.runner;
       return cache[cacheKey];
     }
     case "Luna": {
-      const { Luna } = await import("./agent-EVEICU37.js");
+      const { Luna } = await import("./agent-V4YXHV4R.js");
       const built = await Luna();
       cache[cacheKey] = built.runner;
       return cache[cacheKey];
@@ -86,7 +86,6 @@ var SignUpSchema = z.object({
 async function signupRoute(app2) {
   app2.post("/auth/signup", async (req, reply) => {
     const parsed = SignUpSchema.safeParse(req.body);
-    console.log(parsed);
     if (!parsed.success) {
       return reply.code(400).send({ ok: false, error: "Invalid input", details: parsed.error.flatten() });
     }
@@ -185,8 +184,7 @@ async function signinRoute(app2) {
 // src/api/auth/check.ts
 async function authCheckRoute(app2) {
   app2.get("/auth/check", async (req, reply) => {
-    var _a;
-    const sid = (_a = req.cookies) == null ? void 0 : _a.sid;
+    const sid = req.cookies?.sid;
     if (!sid) {
       return reply.code(401).send({ ok: false });
     }
@@ -546,7 +544,7 @@ async function fetchSpeechMarks(client, baseParams) {
     const marks = raw.split(/\r?\n/).map((line) => {
       try {
         const parsed = JSON.parse(line);
-        if ((parsed == null ? void 0 : parsed.type) !== "word" || typeof parsed.value !== "string") {
+        if (parsed?.type !== "word" || typeof parsed.value !== "string") {
           return null;
         }
         const time = Number(parsed.time ?? 0);
@@ -807,7 +805,7 @@ async function synthesizePollySpeech(body) {
       };
     } catch (err) {
       lastError = err;
-      const isInvalid = (err == null ? void 0 : err.name) === "InvalidSsmlException" || /Unsupported Neural feature/i.test((err == null ? void 0 : err.message) ?? "");
+      const isInvalid = err?.name === "InvalidSsmlException" || /Unsupported Neural feature/i.test(err?.message ?? "");
       if (!isInvalid) {
         throw err;
       }
@@ -850,7 +848,7 @@ async function ttsRoute(app2) {
       req.log.error({ err: error }, "Polly TTS failed");
       return reply.code(500).send({
         ok: false,
-        error: (error == null ? void 0 : error.message) ?? "Polly synthesis failed"
+        error: error?.message ?? "Polly synthesis failed"
       });
     }
   });
@@ -864,16 +862,36 @@ var app = Fastify({ logger: true });
 app.addHook("onRoute", (route) => {
   app.log.info(`\u{1F4E1} Registered route: [${route.method}] ${route.url}`);
 });
+var rawOrigins = process.env.CORS_ORIGINS;
+var allowedOrigins = (rawOrigins ? rawOrigins.split(",").map((origin) => origin.trim()) : ["http://localhost:5173", "http://127.0.0.1:5173"]).map((origin) => origin.replace(/\/$/, "")).filter(Boolean);
 await app.register(cors, {
-  origin: "http://localhost:5173",
-  // your Vite frontend
+  origin(origin, cb) {
+    if (!origin) return cb(null, true);
+    const normalized = origin.replace(/\/$/, "");
+    if (allowedOrigins.includes("*") || allowedOrigins.includes(normalized)) {
+      return cb(null, true);
+    }
+    cb(new Error(`Origin ${origin} is not allowed by CORS policy`), false);
+  },
   credentials: true
-  // enables cookies
 });
+var cookieSecret = process.env.COOKIE_SECRET || "replace-me";
+if (!process.env.COOKIE_SECRET) {
+  app.log.warn("COOKIE_SECRET is not set; using an insecure default. Set COOKIE_SECRET in production.");
+}
 await app.register(cookie, {
-  secret: "supersecretvalue"
-  // optional signing secret
+  secret: cookieSecret
 });
+var edgeSecret = process.env.EDGE_SECRET?.trim();
+if (edgeSecret) {
+  app.addHook("onRequest", async (req, reply) => {
+    if (!req.url.startsWith("/adk/")) return;
+    const provided = req.headers["x-edge-auth"];
+    if (provided !== edgeSecret) {
+      return reply.code(403).send({ error: "Forbidden" });
+    }
+  });
+}
 await app.register(signupRoute, { prefix: "/adk/api" });
 await app.register(signinRoute, { prefix: "/adk/api" });
 await app.register(authCheckRoute, { prefix: "/adk/api" });
@@ -888,20 +906,19 @@ app.post("/adk/agents/:name/ask", async (req, reply) => {
       return reply.code(400).send({ error: 'Missing "input" string in body' });
     }
     const runner = await makeRunnerByName(name);
-    if (!(runner == null ? void 0 : runner.ask)) throw new Error(`Runner for ${name} has no "ask"`);
+    if (!runner?.ask) throw new Error(`Runner for ${name} has no "ask"`);
     const out = await runner.ask(input);
     return { reply: typeof out === "string" ? out : String(out) };
   } catch (err) {
     app.log.error(err);
-    return reply.code(500).send({ error: (err == null ? void 0 : err.message) || "Internal error" });
+    return reply.code(500).send({ error: err?.message || "Internal error" });
   }
 });
 if (process.env.NODE_ENV === "production") {
-  const uiDir = path3.resolve(__dirname, "../../dist/ui");
+  const uiDir = path3.resolve(__dirname, "../../dist");
   await app.register(fastifyStatic, { root: uiDir, prefix: "/" });
   app.setNotFoundHandler((req, reply) => {
-    var _a;
-    if (req.raw.method === "GET" && ((_a = req.headers.accept) == null ? void 0 : _a.includes("text/html"))) {
+    if (req.raw.method === "GET" && req.headers.accept?.includes("text/html")) {
       return reply.sendFile("index.html");
     }
     reply.code(404).send({ error: "Not found" });
@@ -913,8 +930,13 @@ app.addHook("onReady", async () => {
   app.printRoutes();
 });
 await prewarmRunners(["Helena"]);
-var PORT = Number(process.env.API_PORT || 4e3);
+app.get("/health", async () => ({ ok: true }));
+var PORT = Number(process.env.PORT || process.env.API_PORT || 4e3);
 var HOST = "0.0.0.0";
-app.listen({ port: PORT, host: HOST }).then(() => {
+try {
+  await app.listen({ port: PORT, host: HOST });
   app.log.info(`\u{1F525} ADK server running on http://127.0.0.1:${PORT}`);
-});
+} catch (err) {
+  app.log.error(err);
+  process.exit(1);
+}

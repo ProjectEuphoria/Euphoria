@@ -14,7 +14,6 @@ export default async function signupRoute(app: FastifyInstance) {
   // NOTE: NO /adk here. The prefix will be added where we register the plugin.
   app.post("/auth/signup", async (req, reply) => {
     const parsed = SignUpSchema.safeParse(req.body);
-    console.log(parsed)
     if (!parsed.success) {
       return reply.code(400).send({ ok: false, error: "Invalid input", details: parsed.error.flatten() });
     }
