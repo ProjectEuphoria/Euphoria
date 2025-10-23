@@ -9,7 +9,11 @@
     "start": "NODE_ENV=production node dist/api/http.server.js",
     "preview": "vite preview",
     "cli": "tsx src/cli.ts",
-    "once": "tsx src/once.ts"
+    "once": "tsx src/once.ts",
+    "build:client": "vite build",
+    "build:server": "tsc -p tsconfig.json",
+    "build": "npm run build:client && npm run build:server",
+    "start": "node dist/api/http.server.js"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^2.0.23",

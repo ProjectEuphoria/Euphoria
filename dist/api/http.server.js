@@ -877,7 +877,9 @@ await app.register(cors, {
 });
 var cookieSecret = process.env.COOKIE_SECRET || "replace-me";
 if (!process.env.COOKIE_SECRET) {
-  app.log.warn("COOKIE_SECRET is not set; using an insecure default. Set COOKIE_SECRET in production.");
+  app.log.warn(
+    "COOKIE_SECRET is not set; using an insecure default. Set COOKIE_SECRET in production."
+  );
 }
 await app.register(cookie, {
   secret: cookieSecret
@@ -916,26 +918,34 @@ app.post("/adk/agents/:name/ask", async (req, reply) => {
 });
 if (process.env.NODE_ENV === "production") {
   const uiDir = path3.resolve(__dirname, "../../dist");
-  await app.register(fastifyStatic, { root: uiDir, prefix: "/" });
+  await app.register(fastifyStatic, {
+    root: uiDir,
+    prefix: "/",
+    // serve at /
+    wildcard: true,
+    // allow nested paths
+    index: "index.html"
+  });
   app.setNotFoundHandler((req, reply) => {
-    if (req.raw.method === "GET" && req.headers.accept?.includes("text/html")) {
+    const accept = req.headers.accept || "";
+    if (req.raw.method === "GET" && accept.includes("text/html")) {
       return reply.sendFile("index.html");
     }
-    reply.code(404).send({ error: "Not found" });
+    return reply.code(404).send({ error: "Not found" });
   });
 }
+app.get("/health", async () => ({ ok: true }));
+await prewarmRunners(["Helena"]);
 app.addHook("onReady", async () => {
   console.log("\u2705 Fastify middleware & routes fully loaded");
   console.log("\u{1F4CD} Routes registered:");
   app.printRoutes();
 });
-await prewarmRunners(["Helena"]);
-app.get("/health", async () => ({ ok: true }));
-var PORT = Number(process.env.PORT || process.env.API_PORT || 4e3);
+var PORT = Number(process.env.PORT || process.env.API_PORT || 8080);
 var HOST = "0.0.0.0";
 try {
   await app.listen({ port: PORT, host: HOST });
-  app.log.info(`\u{1F525} ADK server running on http://127.0.0.1:${PORT}`);
+  app.log.info(`\u{1F525} ADK server running on :${PORT} (host=${HOST}, env=${process.env.NODE_ENV})`);
 } catch (err) {
   app.log.error(err);
   process.exit(1);
