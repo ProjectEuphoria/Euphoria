@@ -536,10 +536,28 @@ export default function ChattingPage() {
   }
 
   return (
-    <div
-      className="min-h-screen w-full relative"
-      style={bgImg ? { backgroundImage: `url(${bgImg})`, backgroundSize: "cover", backgroundPosition: "center" } : undefined}
-    >
+    <div className="min-h-screen w-full relative">
+      {/* Background - Video for Luna, Image for others */}
+      {normalizedName === 'luna' ? (
+        <video
+          autoPlay
+          loop
+          muted
+          playsInline
+          className="fixed inset-0 w-full h-full object-cover z-0"
+        >
+          <source src="/bgvideo/Luna_BG.mp4" type="video/mp4" />
+        </video>
+      ) : (
+        <div
+          className="fixed inset-0 w-full h-full bg-cover bg-center z-0"
+          style={{ backgroundImage: `url(${bgImg})` }}
+        />
+      )}
+      
+      {/* legibility overlay */}
+      <div className={`absolute inset-0 ${normalizedName === 'luna' ? 'bg-black/15' : 'bg-black/30'}`} />
+
       <aside
         className={`fixed inset-y-0 left-0 z-30 w-[19rem] sm:w-[20.5rem] px-5 py-0 transition-transform duration-500 ease-[cubic-bezier(0.22,0.61,0.36,1)] ${panelOpen ? "translate-x-0" : "-translate-x-[calc(100%+2.5rem)]"}`}
         aria-hidden={!panelOpen}
@@ -623,9 +641,6 @@ export default function ChattingPage() {
       >
         {panelOpen ? <ChevronLeft className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
       </button>
-
-      {/* legibility overlay */}
-      <div className="absolute inset-0 bg-black/30" />
 
       {/* Centered header */}
       <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10">
