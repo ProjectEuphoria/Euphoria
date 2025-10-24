@@ -1,4 +1,7 @@
-import { type FC } from "react";
+import { type FC, useState } from "react";
+import { Card, CardContent } from "../ui/card";
+import { Button } from "../ui/button";
+import { MessageCircle, Sparkles } from "lucide-react";
 
 export type CharacterCardProps = {
   name: string;
@@ -7,68 +10,73 @@ export type CharacterCardProps = {
   onClick?: () => void;
 };
 
+const CharacterCard: FC<CharacterCardProps> = ({ name, description, imageSrc, onClick }) => {
+  const [isHovered, setIsHovered] = useState(false);
 
+  const getPersonaColor = (name: string) => {
+    const colors = {
+      Helena: "from-purple-500 to-indigo-600",
+      Milo: "from-orange-500 to-red-600", 
+      Kai: "from-blue-500 to-cyan-600",
+      Sophie: "from-pink-500 to-rose-600",
+      Luna: "from-violet-500 to-purple-600"
+    };
+    return colors[name as keyof typeof colors] || "from-purple-500 to-pink-600";
+  };
 
-
-const CharacterCard: FC<CharacterCardProps> = ({
-  name,
-  description,
-  imageSrc,
-  onClick,
-}) => {
   return (
-    <button
-      type="button"
+    <Card 
+      className="group cursor-pointer transform transition-all duration-300 hover:scale-105 hover:shadow-2xl bg-black/40 border-white/10 backdrop-blur-sm overflow-hidden max-w-sm"
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
       onClick={onClick}
-      aria-label={`Select ${name}`}
-      className="
-        group relative overflow-hidden rounded-2xl
-        bg-background/40 ring-1 ring-border/60
-        shadow-[0_10px_30px_var(--shadow-md,rgba(0,0,0,0.35))]
-        focus:outline-none focus-visible:ring-2 focus-visible:ring-ring
-        text-left
-      "
-      style={{ width: "270px", height: "60vh" }}
     >
-      {/* Image */}
-      <div className="aspect-[4/5] w-full h-full overflow-hidden">
+      <div className={`absolute inset-0 bg-gradient-to-br ${getPersonaColor(name)} opacity-0 group-hover:opacity-10 transition-opacity duration-300`} />
+      
+      <div className="relative aspect-[4/5] overflow-hidden">
         <img
           src={imageSrc}
           alt={name}
-          className="h-full w-full object-cover"
+          className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
         />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
+        
+        {isHovered && (
+          <div className="absolute top-4 right-4">
+            <Sparkles className="h-6 w-6 text-yellow-400 animate-pulse" />
+          </div>
+        )}
       </div>
-
-      {/* Persistent name badge (always visible) */}
-      <div className="absolute inset-x-0 bottom-0 p-3 z-10">
-        <div
-          className="
-            inline-block rounded-lg bg-black/40 px-2.5 py-1.5
-            text-white text-sm font-semibold ring-1 ring-white/20 backdrop-blur
-          "
-        >
-          {name}
+      
+      <CardContent className="absolute bottom-0 left-0 right-0 p-6 text-white">
+        <div className="space-y-3">
+          <h3 className={`text-2xl font-bold bg-gradient-to-r ${getPersonaColor(name)} bg-clip-text text-transparent`}>
+            {name}
+          </h3>
+          
+          <div className={`transition-all duration-300 ${isHovered ? 'max-h-40 opacity-100' : 'max-h-0 opacity-0'} overflow-hidden`}>
+            <p className="text-white/90 text-sm leading-relaxed mb-4">
+              {description}
+            </p>
+            
+            <Button 
+              variant="ghost" 
+              size="sm"
+              className={`w-full bg-gradient-to-r ${getPersonaColor(name)} text-white hover:opacity-90 transform transition-all duration-200`}
+            >
+              <MessageCircle className="h-4 w-4 mr-2" />
+              Chat with {name}
+            </Button>
+          </div>
+          
+          {!isHovered && (
+            <div className="text-white/60 text-xs">
+              Hover to learn more
+            </div>
+          )}
         </div>
-      </div>
-
-      {/* Hover panel: slides up + fades in from bottom */}
-      <div
-        className="
-          absolute inset-x-0 bottom-0 z-0 h-full
-          opacity-0 pointer-events-none
-          transition-opacity duration-300 ease-out
-          group-hover:opacity-100
-          bg-gradient-to-t from-black/80 via-black/50 to-transparent
-          backdrop-blur-sm
-          px-3 pb-3 pt-16
-        "
-      >
-        <p className="text-[12px] leading-snug text-white/90">
-          {description}
-        </p>
-      </div>
-
-    </button>
+      </CardContent>
+    </Card>
   );
 };
 
