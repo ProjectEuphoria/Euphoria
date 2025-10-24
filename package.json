@@ -4,9 +4,10 @@
   "version": "1.0.0",
   "type": "module",
   "engines": {
-    "node": ">=18.0.0",
-    "npm": ">=9.0.0"
-  },
+      "node": "22.16.0",
+      "npm": ">=10.0.0"
+    }
+    ,
   "scripts": {
     "dev": "concurrently -k -n UI,API -c cyan,magenta \"vite\" \"tsx src/api/http.server.ts\"",
     "build": "npm run build:server",
