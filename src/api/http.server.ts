@@ -22,92 +22,49 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// EB is behind nginx/ALB → trust proxy headers
-const app = Fastify({ logger: true, trustProxy: true });
+const app = Fastify({ 
+  logger: {
+    level: process.env.LOG_LEVEL || 'info',
+    transport: process.env.NODE_ENV === 'development' ? {
+      target: 'pino-pretty'
+    } : undefined
+  },
+  trustProxy: true,
+  disableRequestLogging: process.env.NODE_ENV === 'production'
+});
 
-// Crash guards so background errors never kill the process
+// Production error handling
 process.on("unhandledRejection", (err: any) => {
   app.log.error({ err }, "unhandledRejection");
 });
 process.on("uncaughtException", (err: any) => {
   app.log.error({ err }, "uncaughtException");
-});
-
-// Log route registration (handy on EB)
-app.addHook("onRoute", (route) => {
-  app.log.info(`📡 [${route.method}] ${route.url}`);
+  process.exit(1);
 });
 
 // ----------------------------------------------------------
-// 🧩 CORS & Cookies
+// 🧩 CORS & Security
 // ----------------------------------------------------------
-const rawOrigins = process.env.CORS_ORIGINS; // comma-separated
-let allowedOrigins = (rawOrigins
-  ? rawOrigins.split(",").map((o) => o.trim())
-  : ["http://localhost:5173", "http://127.0.0.1:5173"]
-)
-  .map((o) => o.replace(/\/$/, ""))
-  .filter(Boolean);
-
-// In production, if not provided, allow EB hostname(s)
-if (process.env.NODE_ENV === "production" && !rawOrigins) {
-  // You can restrict instead of wildcard by setting EB_HOSTNAME
-  const ebHost = process.env.EB_HOSTNAME; // e.g. euphoria-prod.eba-xxxx.ap-south-1.elasticbeanstalk.com
-  if (ebHost) {
-    allowedOrigins.push(`https://${ebHost}`, `http://${ebHost}`);
-  } else {
-    // allow *.elasticbeanstalk.com by default
-    allowedOrigins.push("elasticbeanstalk:*");
-  }
-}
-
-function isAllowedOrigin(origin: string) {
-  if (allowedOrigins.includes("*")) return true;
-  const normalized = origin.replace(/\/$/, "");
-  if (allowedOrigins.includes(normalized)) return true;
-
-  // Safely parse to get hostname (avoid throwing on non-absolute origins)
-  try {
-    const u = new URL(normalized);
-    const host = u.hostname || "";
-    if (
-      allowedOrigins.includes("elasticbeanstalk:*") &&
-      /\.elasticbeanstalk\.com$/i.test(host)
-    ) {
-      return true;
-    }
-  } catch {
-    // ignore
-  }
-  return false;
-}
+const allowedOrigins = process.env.CORS_ORIGINS 
+  ? process.env.CORS_ORIGINS.split(",").map(o => o.trim())
+  : [
+      "http://localhost:5173",
+      "http://127.0.0.1:5173",
+      "https://euphoria-frontend-2025.s3-website.ap-south-1.amazonaws.com"
+    ];
 
 await app.register(cors, {
-  origin(origin, cb) {
-    if (!origin) return cb(null, true); // same-origin or non-browser
-    if (isAllowedOrigin(origin)) return cb(null, true);
-    cb(new Error(`Origin ${origin} is not allowed by CORS policy`), false);
+  origin: (origin, cb) => {
+    if (!origin || allowedOrigins.includes("*") || allowedOrigins.includes(origin)) {
+      return cb(null, true);
+    }
+    cb(new Error(`Origin ${origin} not allowed by CORS`), false);
   },
   credentials: true,
 });
 
-const cookieSecret = process.env.COOKIE_SECRET || "replace-me";
-if (!process.env.COOKIE_SECRET) {
-  app.log.warn("COOKIE_SECRET missing; using insecure default. Set it on EB.");
-}
+const cookieSecret = process.env.COOKIE_SECRET || "euphoria-default-secret-change-in-production";
 await app.register(cookie, { secret: cookieSecret });
-
-// Optional edge auth for /adk/*
-const edgeSecret = process.env.EDGE_SECRET?.trim();
-if (edgeSecret) {
-  app.addHook("onRequest", async (req, reply) => {
-    if (!req.url.startsWith("/adk/")) return;
-    const provided = req.headers["x-edge-auth"];
-    if (provided !== edgeSecret) {
-      return reply.code(403).send({ error: "Forbidden" });
-    }
-  });
-}
 
 // ----------------------------------------------------------
 // 🔐 API Routes
@@ -128,33 +85,69 @@ app.post<{
   try {
     const { name } = req.params;
     const { input } = req.body ?? {};
+    
     if (!input || typeof input !== "string") {
       return reply.code(400).send({ error: 'Missing "input" string in body' });
     }
+
     const runner = await makeRunnerByName(name);
-    if (!runner?.ask) throw new Error(`Runner for ${name} has no "ask"`);
-    const out = await runner.ask(input);
-    return { reply: typeof out === "string" ? out : String(out) };
+    if (!runner?.ask) {
+      return reply.code(404).send({ error: `Agent ${name} not found` });
+    }
+
+    const result = await runner.ask(input);
+    return { 
+      reply: typeof result === "string" ? result : String(result),
+      persona: name,
+      timestamp: new Date().toISOString()
+    };
   } catch (err: any) {
-    app.log.error(err);
-    return reply.code(500).send({ error: err?.message || "Internal error" });
+    app.log.error({ err, params: req.params }, "Agent chat error");
+    return reply.code(500).send({ 
+      error: process.env.NODE_ENV === 'production' 
+        ? "Internal server error" 
+        : err?.message || "Unknown error"
+    });
   }
 });
 
 // ----------------------------------------------------------
-// 🧱 Static UI (Vite build) — enabled in production
+// 🩺 Health & Status Routes
+// ----------------------------------------------------------
+app.get("/health", async () => ({ 
+  status: "healthy",
+  timestamp: new Date().toISOString(),
+  uptime: process.uptime(),
+  memory: process.memoryUsage(),
+  version: process.env.npm_package_version || "1.0.0"
+}));
+
+app.get("/adk/api/health", async () => ({ 
+  status: "healthy",
+  service: "EUPHORIA API",
+  timestamp: new Date().toISOString(),
+  personas: ["Helena", "Luna", "Milo", "Kai", "Sophie"]
+}));
+
+app.get("/version", async () => ({
+  version: process.env.npm_package_version || "1.0.0",
+  node: process.version,
+  env: process.env.NODE_ENV || "development"
+}));
+
+// ----------------------------------------------------------
+// 🧱 Static UI (Production only)
 // ----------------------------------------------------------
 if (process.env.NODE_ENV === "production") {
-  // Runtime __dirname ≈ "<root>/dist/api" → UI at "../../dist"
   const uiDir = path.resolve(__dirname, "../../dist");
-
+  
   await app.register(fastifyStatic, {
     root: uiDir,
     prefix: "/",
     index: "index.html",
   });
 
-  // SPA fallback: serve index.html for unknown GETs that accept HTML
+  // SPA fallback
   app.setNotFoundHandler((req, reply) => {
     const accept = req.headers.accept || "";
     if (req.raw.method === "GET" && accept.includes("text/html")) {
@@ -165,56 +158,52 @@ if (process.env.NODE_ENV === "production") {
 }
 
 // ----------------------------------------------------------
-// 🩺 Health & Version
+// ⚡ Warm-up
 // ----------------------------------------------------------
-app.get("/health", async () => ({ ok: true, ts: Date.now() }));
-app.get("/version", async () => ({
-  version: process.env.APP_VERSION || "unknown",
-  node: process.version,
-  env: process.env.NODE_ENV,
-}));
+if (process.env.NODE_ENV === "production") {
+  prewarmRunners(["Helena", "Luna"])
+    .then(() => app.log.info("✅ Runners prewarmed"))
+    .catch((e) => app.log.warn({ err: e }, "⚠️ Prewarm failed"));
+}
 
 // ----------------------------------------------------------
-// ⚡ Warm-up (non-blocking on EB)
+// 🚀 Server Startup
 // ----------------------------------------------------------
-prewarmRunners(["Helena"])
-  .then(() => app.log.info("Runners prewarmed"))
-  .catch((e) => app.log.warn({ err: e }, "prewarmRunners failed"));
+const PORT = Number(process.env.PORT || 8080);
+const HOST = process.env.HOST || "0.0.0.0";
 
-// ----------------------------------------------------------
-// 🚀 Startup (EB injects PORT; bind 0.0.0.0)
-// ----------------------------------------------------------
 app.addHook("onReady", async () => {
-  app.log.info("✅ Fastify ready; routes below");
-  app.printRoutes();
+  app.log.info(`🚀 EUPHORIA API ready on ${HOST}:${PORT}`);
+  if (process.env.NODE_ENV === 'development') {
+    app.printRoutes();
+  }
 });
-
-const PORT = Number(process.env.PORT || process.env.API_PORT || 8080);
-const HOST = "0.0.0.0";
 
 try {
   await app.listen({ port: PORT, host: HOST });
-  app.log.info(`🔥 Server on :${PORT} (env=${process.env.NODE_ENV})`);
+  app.log.info(`✅ Server running on http://${HOST}:${PORT}`);
 } catch (err) {
-  app.log.error({ err }, "Failed to start server");
+  app.log.error({ err }, "❌ Failed to start server");
   process.exit(1);
 }
 
 // ----------------------------------------------------------
-// 🧹 Graceful shutdown on EB stop
+// 🧹 Graceful Shutdown
 // ----------------------------------------------------------
-for (const sig of ["SIGINT", "SIGTERM"] as const) {
-  process.on(sig, async () => {
-    app.log.info({ sig }, "Shutting down...");
-    try {
-      await app.close();
-      process.exit(0);
-    } catch (e) {
-      app.log.error({ e }, "Error during shutdown");
-      process.exit(1);
-    }
-  });
-}
+const gracefulShutdown = async (signal: string) => {
+  app.log.info(`📴 Received ${signal}, shutting down gracefully...`);
+  try {
+    await app.close();
+    app.log.info("✅ Server closed successfully");
+    process.exit(0);
+  } catch (err) {
+    app.log.error({ err }, "❌ Error during shutdown");
+    process.exit(1);
+  }
+};
 
-// Export app for Lambda
+process.on("SIGINT", () => gracefulShutdown("SIGINT"));
+process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
+
+// Export for Lambda compatibility
 export { app };

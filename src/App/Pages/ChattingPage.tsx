@@ -482,10 +482,10 @@ export default function ChattingPage() {
     setTtsPending(false);
 
     try {
-      const res = await fetch(`${API_BASE_URL}/api/chat/${name}`, {
+      const res = await fetch(`${API_BASE_URL}/agents/${name}/ask`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: msg }),
+        body: JSON.stringify({ input: msg }),
         signal: controllerRef.current.signal,
       });
 
@@ -498,12 +498,12 @@ export default function ChattingPage() {
         throw new Error(`/${name}/ask ${res.status}: ${errText}`);
       }
 
-      const data = isJson ? await res.json() : { response: await res.text() };
+      const data = isJson ? await res.json() : { reply: await res.text() };
       setTtsPending(true);
       setSpeechMarks([]);
       setRenderedReply("");
       setStreaming(false);
-      setAiReply(String(data.response ?? ""));
+      setAiReply(String(data.reply ?? ""));
     } catch (e: any) {
       if (e?.name !== "AbortError") {
         const message = `⚠️ ${e?.message ?? String(e)}`;

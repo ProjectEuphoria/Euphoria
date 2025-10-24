@@ -1,5 +1,5 @@
 const API_BASE_URL = import.meta.env.PROD 
-  ? 'https://rch4sl29v5.execute-api.ap-south-1.amazonaws.com/prod'
+  ? 'https://euphoria-production.up.railway.app/adk'
   : '/adk';
 
 export { API_BASE_URL };

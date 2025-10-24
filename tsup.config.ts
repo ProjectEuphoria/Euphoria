@@ -1,29 +1,30 @@
 import { defineConfig } from 'tsup'
 
 export default defineConfig([
-  // API server build
+  // API server build for Railway
   {
     entry: ['src/api/http.server.ts'],
     format: ['esm'],
     target: 'node18',
-    outDir: 'dist',
+    outDir: 'dist/api',
     clean: true,
     splitting: false,
-    sourcemap: true,
+    sourcemap: process.env.NODE_ENV !== 'production',
     dts: false,
-    external: ['fastify', '@fastify/cors', '@fastify/cookie', '@fastify/static'],
-  },
-  // Lambda handler build
-  {
-    entry: ['src/lambda-minimal.ts'],
-    format: ['cjs'],
-    target: 'node20',
-    outDir: 'dist',
-    clean: false,
-    splitting: false,
-    sourcemap: false,
-    dts: false,
-    bundle: true,
-    noExternal: [/.*/],
+    minify: process.env.NODE_ENV === 'production',
+    treeshake: true,
+    external: [
+      'fastify',
+      '@fastify/cors', 
+      '@fastify/cookie', 
+      '@fastify/static',
+      '@iqai/adk',
+      'dotenv'
+    ],
+    esbuildOptions(options) {
+      options.banner = {
+        js: '// EUPHORIA API Server - Production Build'
+      }
+    }
   },
 ])

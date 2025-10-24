@@ -1,21 +1,20 @@
 {
-  "name": "vite-project",
+  "name": "euphoria-ai-chat",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
   "engines": {
-    "node": "18.x",
-    "npm": "9.x"
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
   },
   "scripts": {
     "dev": "concurrently -k -n UI,API -c cyan,magenta \"vite\" \"tsx src/api/http.server.ts\"",
-    "build": "npm run build:client && npm run build:server",
+    "build": "npm run build:server",
     "start": "node dist/api/http.server.js",
-    "preview": "vite preview",
-    "cli": "tsx src/cli.ts",
-    "once": "tsx src/once.ts",
     "build:client": "vite build",
-    "build:server": "tsup"
+    "build:server": "tsup",
+    "preview": "vite preview",
+    "postinstall": "npm run build"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^2.0.23",
@@ -78,9 +77,9 @@
     "typescript-eslint": "^8.44.0",
     "vite": "^7.1.12"
   },
-  "description": "This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.",
-  "main": "eslint.config.js",
-  "keywords": [],
-  "author": "",
-  "license": "ISC"
+  "description": "EUPHORIA - Multi-persona AI chat application with human-feeling conversations",
+  "main": "dist/api/http.server.js",
+  "keywords": ["ai", "chat", "personas", "conversational-ai", "gemini", "fastify"],
+  "author": "EUPHORIA Team",
+  "license": "MIT"
 }
