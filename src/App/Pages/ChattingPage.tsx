@@ -529,6 +529,7 @@ export default function ChattingPage() {
     <div className="min-h-screen w-full relative">
       {/* Background - Video for all personas */}
       <video
+        key={normalizedName}
         autoPlay
         loop
         muted
@@ -627,10 +628,7 @@ export default function ChattingPage() {
 
       {/* Centered header */}
       <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10">
-        <div className="px-5 py-2 rounded-2xl border border-white/20 bg-black/45 backdrop-blur-xl text-white shadow-lg">
-          <span className="opacity-80">Chatting with</span>{" "}
-          <span className="font-semibold">“{name || "AI"}”</span>
-        </div>
+       
       </div>
       <div className="absolute top-4 right-4 z-10">
         <button
