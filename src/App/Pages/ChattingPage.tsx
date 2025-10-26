@@ -4,11 +4,6 @@ import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, ChevronLeft, ChevronRight, Sparkles, Volume2, VolumeX } from "lucide-react";
 import { buildChatUrl } from "../../utils/url";
 import { API_BASE_URL } from "../../config/api";
-import helenaImg from "../../assets/give a good anime background which is subjected to no copyright.jpg";
-import miloImg from "../../assets/Milo_bg.jpg";
-import sophieImg from "../../assets/Sophie_bg.jpg";
-import kaiImg from "../../assets/Kai_bg.jpg";
-import lunaImg from "../../assets/Luna_bg.jpg";
 
 type AskResponse = { reply?: string; error?: string };
 
@@ -18,14 +13,6 @@ type SpeechMark = {
   type: string;
   start?: number;
   end?: number;
-};
-
-const PERSONA_BACKGROUNDS: Record<string, string> = {
-  helena: helenaImg,
-  milo: miloImg,
-  kai: kaiImg,
-  sophie: sophieImg,
-  luna: lunaImg,
 };
 
 const PERSONA_DETAILS: Record<string, { accent: string; glow: string; tagline: string }> = {
@@ -184,7 +171,6 @@ export default function ChattingPage() {
   const normalizedName = name.toLowerCase();
   const isKnownPersona = allBots.some((bot) => bot.toLowerCase() === normalizedName);
   const otherBots = allBots.filter((bot) => bot.toLowerCase() !== normalizedName);
-  const bgImg = PERSONA_BACKGROUNDS[normalizedName];
   const canonicalPersona = allBots.find((bot) => bot.toLowerCase() === normalizedName) ?? allBots[0];
   const isLoadingReply = ttsPending || (sending && aiReply === "…");
 
@@ -541,26 +527,19 @@ export default function ChattingPage() {
 
   return (
     <div className="min-h-screen w-full relative">
-      {/* Background - Video for Luna, Image for others */}
-      {normalizedName === 'luna' ? (
-        <video
-          autoPlay
-          loop
-          muted
-          playsInline
-          className="fixed inset-0 w-full h-full object-cover z-0"
-        >
-          <source src="/bgvideo/Luna_BG.mp4" type="video/mp4" />
-        </video>
-      ) : (
-        <div
-          className="fixed inset-0 w-full h-full bg-cover bg-center z-0"
-          style={{ backgroundImage: `url(${bgImg})` }}
-        />
-      )}
+      {/* Background - Video for all personas */}
+      <video
+        autoPlay
+        loop
+        muted
+        playsInline
+        className="fixed inset-0 w-full h-full object-cover z-0"
+      >
+        <source src={`/bgvideo/${normalizedName.charAt(0).toUpperCase() + normalizedName.slice(1)}_BG.mp4`} type="video/mp4" />
+      </video>
       
       {/* legibility overlay */}
-      <div className={`absolute inset-0 ${normalizedName === 'luna' ? 'bg-black/15' : 'bg-black/30'}`} />
+      <div className="absolute inset-0 bg-black/15" />
 
       <aside
         className={`fixed inset-y-0 left-0 z-30 w-[16rem] sm:w-[19rem] md:w-[20.5rem] px-4 sm:px-5 py-0 transition-transform duration-500 ease-[cubic-bezier(0.22,0.61,0.36,1)] ${panelOpen ? "translate-x-0" : "-translate-x-[calc(100%+2rem)] sm:-translate-x-[calc(100%+2.5rem)]"}`}
