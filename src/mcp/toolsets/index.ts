@@ -1,65 +1,42 @@
-import type { BaseTool, McpToolset } from "@iqai/adk";
-import { McpIqWiki } from "@iqai/adk";
-import { filesystemToolset, getFilesystemTools } from "./localContext";
-import { webSearchToolset, getWebSearchTools } from "./search";
-import { wikipediaToolset, getWikipediaTools } from "./knowledge";
-import { unsplashToolset, getUnsplashTools } from "./visuals";
-import { spotifyToolset, getSpotifyTools } from "./music";
-import { emotionToolset, getEmotionTools } from "./emotion";
-import { journalingToolset, getJournalingTools } from "./journal";
-import { trendsToolset, getTrendsTools } from "./trends";
-import { quotesToolset, getQuotesTools } from "./quotes";
-import { getSummarizerTools } from "./summarizer";
-import { getWellnessTools } from "./wellness";
-import { getPersonaTelegramTools } from "./personaTelegram";
-import { getPersonaDiscordTools } from "./personaDiscord";
+import type { Tool } from "../../api/adapters/google-ai-adapter.js";
+import { getLocalContextTools } from "./localContext.js";
+import { getWebSearchTools } from "./search.js";
+import { getPersonaTelegramTools } from "./personaTelegram.js";
+import { getPersonaDiscordTools } from "./personaDiscord.js";
+import { getSpotifyTools } from "./music.js";
+import { getWellnessTools } from "./wellness.js";
+import { getSummarizerTools } from "./summarizer.js";
+import { getQuotesTools } from "./quotes.js";
+import { getWikipediaTools } from "./knowledge.js";
+import { getUnsplashTools } from "./visuals.js";
+import { getJournalingTools } from "./journal.js";
+import { getEmotionTools } from "./emotion.js";
+import { getTrendsTools } from "./trends.js";
 
-const iqWikiToolset = McpIqWiki();
-
-export type ToolsetLoader = () => Promise<BaseTool[]>;
+export type ToolsetLoader = () => Promise<Tool[]>;
 
 export type ToolsetRegistration = {
   name: string;
   loader: ToolsetLoader;
-  toolset?: McpToolset;
+  toolset?: any;
 };
 
 const baseRegistrations: ToolsetRegistration[] = [
-  { name: "local-journal-filesystem", loader: getFilesystemTools, toolset: filesystemToolset },
-  { name: "search-discovery", loader: getWebSearchTools, toolset: webSearchToolset },
-  { name: "knowledge-wikipedia", loader: getWikipediaTools, toolset: wikipediaToolset },
-  {
-    name: "knowledge-iqwiki",
-    loader: async () => {
-      return iqWikiToolset.getTools();
-    },
-    toolset: iqWikiToolset,
-  },
-  { name: "visuals-unsplash", loader: getUnsplashTools, toolset: unsplashToolset },
-  { name: "music-spotify", loader: getSpotifyTools, toolset: spotifyToolset },
-  { name: "emotion-analytics", loader: getEmotionTools, toolset: emotionToolset },
-  { name: "journal-reflection", loader: getJournalingTools, toolset: journalingToolset },
-  { name: "web-trends", loader: getTrendsTools, toolset: trendsToolset },
-  { name: "quotes-feed", loader: getQuotesTools, toolset: quotesToolset },
-  {
-    name: "ai-summarizer",
-    loader: async () => getSummarizerTools(),
-  },
-  {
-    name: "wellness-companion",
-    loader: async () => getWellnessTools(),
-  },
+  { name: "local-journal-filesystem", loader: getLocalContextTools },
+  { name: "search-discovery", loader: getWebSearchTools },
+  { name: "telegram-persona", loader: getPersonaTelegramTools },
+  { name: "discord-persona", loader: getPersonaDiscordTools },
+  { name: "music-spotify", loader: getSpotifyTools },
+  { name: "wellness-companion", loader: getWellnessTools },
+  { name: "ai-summarizer", loader: getSummarizerTools },
+  { name: "quotes-feed", loader: getQuotesTools },
+  { name: "knowledge-wikipedia", loader: getWikipediaTools },
+  { name: "visuals-unsplash", loader: getUnsplashTools },
+  { name: "journal-reflection", loader: getJournalingTools },
+  { name: "emotion-analytics", loader: getEmotionTools },
+  { name: "web-trends", loader: getTrendsTools },
 ];
-baseRegistrations.push({
-  name: "telegram-persona",
-  loader: async () => getPersonaTelegramTools(),
-});
-
-baseRegistrations.push({
-  name: "discord-persona",
-  loader: async () => getPersonaDiscordTools(),
-});
 
 export const TOOLSET_REGISTRY: ToolsetRegistration[] = baseRegistrations;
 
-export type { BaseTool } from "@iqai/adk";
+export type { Tool };

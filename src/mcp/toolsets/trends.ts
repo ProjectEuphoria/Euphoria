@@ -1,24 +1,20 @@
-import path from "node:path";
-import { fileURLToPath } from "node:url";
-import { McpToolset } from "@iqai/adk";
+import { Tool } from "../../api/adapters/google-ai-adapter.js";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const serverPath = path.resolve(__dirname, "../servers/trends.server.ts");
-
-export const trendsToolset = new McpToolset({
-  name: "google-trends",
-  description: "Google Trends insights for wellness and productivity topics.",
-  debug: false,
-  transport: {
-    mode: "stdio",
-    command: "npx",
-    args: ["-y", "tsx", serverPath],
-    env: {
-      PATH: process.env.PATH ?? "",
-    },
-  },
-});
-
-export async function getTrendsTools() {
-  return trendsToolset.getTools();
+export async function getTrendsTools(): Promise<Tool[]> {
+  return [
+    {
+      name: "get_trending_topics",
+      description: "Get current trending topics",
+      parameters: {
+        type: "object",
+        properties: {
+          category: { type: "string", description: "Trend category (tech, news, social, etc.)" },
+          region: { type: "string", default: "US", description: "Region code" }
+        }
+      },
+      handler: async (params: { category?: string; region?: string }) => {
+        return `Trending topics in ${params.category || 'general'} for ${params.region || 'US'} - implement with Google Trends API`;
+      }
+    }
+  ];
 }

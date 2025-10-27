@@ -1,26 +1,21 @@
-import path from "node:path";
-import { fileURLToPath } from "node:url";
-import { McpToolset } from "@iqai/adk";
+import { Tool } from "../../api/adapters/google-ai-adapter.js";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const serverPath = path.resolve(__dirname, "../servers/spotify.server.ts");
-
-export const spotifyToolset = new McpToolset({
-  name: "spotify-mood",
-  description: "Mood-aware Spotify playlists and tracks.",
-  debug: false,
-  transport: {
-    mode: "stdio",
-    command: "npx",
-    args: ["-y", "tsx", serverPath],
-    env: {
-      PATH: process.env.PATH ?? "",
-      SPOTIFY_CLIENT_ID: process.env.SPOTIFY_CLIENT_ID ?? "",
-      SPOTIFY_CLIENT_SECRET: process.env.SPOTIFY_CLIENT_SECRET ?? "",
-    },
-  },
-});
-
-export async function getSpotifyTools() {
-  return spotifyToolset.getTools();
+export async function getSpotifyTools(): Promise<Tool[]> {
+  return [
+    {
+      name: "search_music",
+      description: "Search for music on Spotify",
+      parameters: {
+        type: "object",
+        properties: {
+          query: { type: "string", description: "Search query for music" },
+          type: { type: "string", enum: ["track", "artist", "album"], description: "Type of search" }
+        },
+        required: ["query"]
+      },
+      handler: async (params: { query: string; type?: string }) => {
+        return `Music search for "${params.query}" (${params.type || 'track'}) - implement with Spotify API`;
+      }
+    }
+  ];
 }

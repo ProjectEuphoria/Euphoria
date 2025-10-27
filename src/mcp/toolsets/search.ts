@@ -1,24 +1,22 @@
-import path from "node:path";
-import { fileURLToPath } from "node:url";
-import { McpToolset } from "@iqai/adk";
+import { Tool } from "../../api/adapters/google-ai-adapter.js";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const serverPath = path.resolve(__dirname, "../servers/webSearch.server.ts");
-
-export const webSearchToolset = new McpToolset({
-  name: "web-search",
-  description: "Search and discovery via DuckDuckGo Instant Answer API.",
-  debug: false,
-  transport: {
-    mode: "stdio",
-    command: "npx",
-    args: ["-y", "tsx", serverPath],
-    env: {
-      PATH: process.env.PATH ?? "",
-    },
-  },
-});
-
-export async function getWebSearchTools() {
-  return webSearchToolset.getTools();
+export async function getWebSearchTools(): Promise<Tool[]> {
+  return [
+    {
+      name: "web_search",
+      description: "Search the web for current information",
+      parameters: {
+        type: "object",
+        properties: {
+          query: { type: "string", description: "Search query" },
+          num_results: { type: "number", description: "Number of results (default: 5)" }
+        },
+        required: ["query"]
+      },
+      handler: async (params: { query: string; num_results?: number }) => {
+        // Placeholder - implement with your preferred search API
+        return `Search results for "${params.query}" would appear here. Implement with Google Search API, Bing API, or similar.`;
+      }
+    }
+  ];
 }

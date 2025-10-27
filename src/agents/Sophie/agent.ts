@@ -1,8 +1,8 @@
 // src/agent.ts
-import { AgentBuilder } from "@iqai/adk";
+import { AgentBuilder } from "../../api/adapters/google-ai-adapter.js";
 import * as dotenv from "dotenv";
-import { loadPersonaTools } from "../sharedTools";
-import { getToolUsageGuidance } from "../toolGuidance";
+import { loadPersonaTools } from "../sharedTools.js";
+import { getToolUsageGuidance } from "../toolGuidance.js";
 dotenv.config();
 
 export async function Sophie() {

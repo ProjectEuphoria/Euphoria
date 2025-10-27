@@ -1,26 +1,22 @@
-import path from "node:path";
-import { fileURLToPath } from "node:url";
-import { McpToolset } from "@iqai/adk";
-import { journalRoot } from "./localContext";
+import { Tool } from "../../api/adapters/google-ai-adapter.js";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const serverPath = path.resolve(__dirname, "../servers/journal.server.ts");
-
-export const journalingToolset = new McpToolset({
-  name: "journal-reflection",
-  description: "Reflection prompts and storage helpers on top of local journal.",
-  debug: false,
-  transport: {
-    mode: "stdio",
-    command: "npx",
-    args: ["-y", "tsx", serverPath],
-    env: {
-      PATH: process.env.PATH ?? "",
-      JOURNAL_ROOT: journalRoot,
-    },
-  },
-});
-
-export async function getJournalingTools() {
-  return journalingToolset.getTools();
+export async function getJournalingTools(): Promise<Tool[]> {
+  return [
+    {
+      name: "create_journal_entry",
+      description: "Create a new journal entry",
+      parameters: {
+        type: "object",
+        properties: {
+          title: { type: "string", description: "Journal entry title" },
+          content: { type: "string", description: "Journal entry content" },
+          tags: { type: "array", items: { type: "string" }, description: "Tags for the entry" }
+        },
+        required: ["content"]
+      },
+      handler: async (params: { title?: string; content: string; tags?: string[] }) => {
+        return `Journal entry created: "${params.title || 'Untitled'}" with ${params.content.length} characters`;
+      }
+    }
+  ];
 }

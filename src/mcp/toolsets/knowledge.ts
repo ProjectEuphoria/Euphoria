@@ -1,24 +1,21 @@
-import path from "node:path";
-import { fileURLToPath } from "node:url";
-import { McpToolset } from "@iqai/adk";
+import { Tool } from "../../api/adapters/google-ai-adapter.js";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const serverPath = path.resolve(__dirname, "../servers/wikipedia.server.ts");
-
-export const wikipediaToolset = new McpToolset({
-  name: "wikipedia-knowledge",
-  description: "Knowledge grounding via Wikipedia summaries and search.",
-  debug: false,
-  transport: {
-    mode: "stdio",
-    command: "npx",
-    args: ["-y", "tsx", serverPath],
-    env: {
-      PATH: process.env.PATH ?? "",
-    },
-  },
-});
-
-export async function getWikipediaTools() {
-  return wikipediaToolset.getTools();
+export async function getWikipediaTools(): Promise<Tool[]> {
+  return [
+    {
+      name: "search_wikipedia",
+      description: "Search Wikipedia for information",
+      parameters: {
+        type: "object",
+        properties: {
+          query: { type: "string", description: "Wikipedia search query" },
+          language: { type: "string", default: "en", description: "Language code" }
+        },
+        required: ["query"]
+      },
+      handler: async (params: { query: string; language?: string }) => {
+        return `Wikipedia search for "${params.query}" in ${params.language || 'en'} - implement with Wikipedia API`;
+      }
+    }
+  ];
 }

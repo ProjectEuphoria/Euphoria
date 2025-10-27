@@ -1,12 +1,12 @@
-import type { BaseTool } from "@iqai/adk";
-import { TOOLSET_REGISTRY } from "./toolsets";
-import { PERSONA_TOOLKIT_VERSION } from "../agents/version";
+import type { Tool } from "../api/adapters/google-ai-adapter.js";
+import { TOOLSET_REGISTRY } from "./toolsets/index.js";
+import { PERSONA_TOOLKIT_VERSION } from "../agents/version.js";
 
-let toolsCache: BaseTool[] | null = null;
-let toolsPromise: Promise<BaseTool[]> | null = null;
+let toolsCache: Tool[] | null = null;
+let toolsPromise: Promise<Tool[]> | null = null;
 let cacheVersion: string | null = null;
 
-async function loadAllToolsets(): Promise<BaseTool[]> {
+async function loadAllToolsets(): Promise<Tool[]> {
   const toolArrays = await Promise.all(
     TOOLSET_REGISTRY.map(async ({ name, loader }) => {
       try {
@@ -20,7 +20,7 @@ async function loadAllToolsets(): Promise<BaseTool[]> {
   return toolArrays.flat();
 }
 
-export async function getSharedTools(): Promise<BaseTool[]> {
+export async function getSharedTools(): Promise<Tool[]> {
   if (toolsCache && cacheVersion === PERSONA_TOOLKIT_VERSION) return toolsCache;
   if (!toolsPromise || cacheVersion !== PERSONA_TOOLKIT_VERSION) {
     toolsPromise = loadAllToolsets().then((tools) => {

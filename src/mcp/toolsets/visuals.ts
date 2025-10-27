@@ -1,25 +1,21 @@
-import path from "node:path";
-import { fileURLToPath } from "node:url";
-import { McpToolset } from "@iqai/adk";
+import { Tool } from "../../api/adapters/google-ai-adapter.js";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const serverPath = path.resolve(__dirname, "../servers/unsplash.server.ts");
-
-export const unsplashToolset = new McpToolset({
-  name: "unsplash-visuals",
-  description: "Curate Unsplash imagery for mood-based backgrounds and cards.",
-  debug: false,
-  transport: {
-    mode: "stdio",
-    command: "npx",
-    args: ["-y", "tsx", serverPath],
-    env: {
-      PATH: process.env.PATH ?? "",
-      UNSPLASH_ACCESS_KEY: process.env.UNSPLASH_ACCESS_KEY ?? "",
-    },
-  },
-});
-
-export async function getUnsplashTools() {
-  return unsplashToolset.getTools();
+export async function getUnsplashTools(): Promise<Tool[]> {
+  return [
+    {
+      name: "search_images",
+      description: "Search for images on Unsplash",
+      parameters: {
+        type: "object",
+        properties: {
+          query: { type: "string", description: "Image search query" },
+          count: { type: "number", default: 5, description: "Number of images" }
+        },
+        required: ["query"]
+      },
+      handler: async (params: { query: string; count?: number }) => {
+        return `Image search for "${params.query}" (${params.count || 5} results) - implement with Unsplash API`;
+      }
+    }
+  ];
 }

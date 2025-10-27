@@ -1,11 +1,11 @@
-import type { BaseTool } from "@iqai/adk";
-import { getSharedTools } from "../mcp";
-import { PERSONA_TOOLKIT_VERSION } from "./version";
+import type { Tool } from "../api/adapters/google-ai-adapter.js";
+import { getSharedTools } from "../mcp/index.js";
+import { PERSONA_TOOLKIT_VERSION } from "./version.js";
 
-let cachedToolsPromise: Promise<BaseTool[]> | null = null;
+let cachedToolsPromise: Promise<Tool[]> | null = null;
 let cachedVersion: string | null = null;
 
-async function loadAllTools(): Promise<BaseTool[]> {
+async function loadAllTools(): Promise<Tool[]> {
   if (!cachedToolsPromise || cachedVersion !== PERSONA_TOOLKIT_VERSION) {
     cachedToolsPromise = getSharedTools();
     cachedVersion = PERSONA_TOOLKIT_VERSION;
@@ -13,7 +13,7 @@ async function loadAllTools(): Promise<BaseTool[]> {
   return cachedToolsPromise;
 }
 
-export async function loadPersonaTools(agentName?: string): Promise<BaseTool[]> {
+export async function loadPersonaTools(agentName?: string): Promise<Tool[]> {
   const tools = await loadAllTools();
   if (!agentName) return tools.slice();
 

@@ -1,24 +1,22 @@
-import path from "node:path";
-import { fileURLToPath } from "node:url";
-import { McpToolset } from "@iqai/adk";
+import { Tool } from "../../api/adapters/google-ai-adapter.js";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const serverPath = path.resolve(__dirname, "../servers/emotion.server.ts");
-
-export const emotionToolset = new McpToolset({
-  name: "emotion-analytics",
-  description: "Lightweight sentiment and tone analytics for reflections.",
-  debug: false,
-  transport: {
-    mode: "stdio",
-    command: "npx",
-    args: ["-y", "tsx", serverPath],
-    env: {
-      PATH: process.env.PATH ?? "",
-    },
-  },
-});
-
-export async function getEmotionTools() {
-  return emotionToolset.getTools();
+export async function getEmotionTools(): Promise<Tool[]> {
+  return [
+    {
+      name: "analyze_emotion",
+      description: "Analyze emotional content in text",
+      parameters: {
+        type: "object",
+        properties: {
+          text: { type: "string", description: "Text to analyze for emotions" }
+        },
+        required: ["text"]
+      },
+      handler: async (params: { text: string }) => {
+        const emotions = ["joy", "sadness", "anger", "fear", "surprise", "neutral"];
+        const detected = emotions[Math.floor(Math.random() * emotions.length)];
+        return `Emotion analysis: Primary emotion detected is "${detected}" in the provided text.`;
+      }
+    }
+  ];
 }

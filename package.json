@@ -4,10 +4,9 @@
   "version": "1.0.0",
   "type": "module",
   "engines": {
-      "node": "22.16.0",
-      "npm": ">=9.0.0"
-    }
-    ,
+    "node": "22.16.0",
+    "npm": ">=9.0.0"
+  },
   "scripts": {
     "dev": "concurrently -k -n UI,API -c cyan,magenta \"vite\" \"tsx src/api/http.server.ts\"",
     "build": "npm run build:server",
@@ -27,7 +26,7 @@
     "@fastify/cookie": "^11.0.2",
     "@fastify/cors": "11.1.0",
     "@fastify/static": "^7.0.4",
-    "@iqai/adk": "^0.3.6",
+    "@google/generative-ai": "^0.21.0",
     "@modelcontextprotocol/sdk": "^1.20.0",
     "@tailwindcss/vite": "^4.1.14",
     "ai": "^5.0.60",
@@ -80,7 +79,14 @@
   },
   "description": "EUPHORIA - Multi-persona AI chat application with human-feeling conversations",
   "main": "dist/api/http.server.js",
-  "keywords": ["ai", "chat", "personas", "conversational-ai", "gemini", "fastify"],
+  "keywords": [
+    "ai",
+    "chat",
+    "personas",
+    "conversational-ai",
+    "gemini",
+    "fastify"
+  ],
   "author": "EUPHORIA Team",
   "license": "MIT"
 }

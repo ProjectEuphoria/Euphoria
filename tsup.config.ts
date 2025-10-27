@@ -18,7 +18,7 @@ export default defineConfig([
       '@fastify/cors', 
       '@fastify/cookie', 
       '@fastify/static',
-      '@iqai/adk',
+      '@google/generative-ai',
       'dotenv'
     ],
     esbuildOptions(options) {
