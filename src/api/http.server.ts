@@ -14,7 +14,10 @@ import { authCheckRoute } from "./auth/check.js";
 import { logoutRoute } from "./auth/logout.js";
 import ttsRoute from "./tts/route.js";
 
-dotenv.config();
+// Only load .env in development
+if (process.env.NODE_ENV !== 'production') {
+  dotenv.config();
+}
 
 // ----------------------------------------------------------
 // 🔧 Setup
@@ -50,7 +53,7 @@ const allowedOrigins = process.env.CORS_ORIGINS
   : [
       "http://localhost:5173",
       "http://127.0.0.1:5173",
-      "https://euphoria-frontend-2025.s3-website.ap-south-1.amazonaws.com"
+      "http://euphoria-frontend-2025.s3-website.ap-south-1.amazonaws.com"
     ];
 
 await app.register(cors, {
@@ -135,27 +138,75 @@ app.get("/version", async () => ({
   env: process.env.NODE_ENV || "development"
 }));
 
-// ----------------------------------------------------------
-// 🧱 Static UI (Production only)
-// ----------------------------------------------------------
-if (process.env.NODE_ENV === "production") {
+// Debug endpoint to check file system
+app.get("/debug/files", async () => {
+  const fs = await import('fs');
   const uiDir = path.resolve(__dirname, "../../dist");
   
-  await app.register(fastifyStatic, {
-    root: uiDir,
-    prefix: "/",
-    index: "index.html",
-  });
+  try {
+    const exists = fs.existsSync(uiDir);
+    const files = exists ? fs.readdirSync(uiDir) : [];
+    const assetsExists = fs.existsSync(path.join(uiDir, 'assets'));
+    const assetsFiles = assetsExists ? fs.readdirSync(path.join(uiDir, 'assets')) : [];
+    
+    return {
+      uiDir,
+      exists,
+      files,
+      assetsExists,
+      assetsFiles, // Show all files
+      __dirname,
+      cwd: process.cwd()
+    };
+  } catch (error) {
+    return { error: error.message, uiDir, __dirname };
+  }
+});
 
-  // SPA fallback
-  app.setNotFoundHandler((req, reply) => {
-    const accept = req.headers.accept || "";
-    if (req.raw.method === "GET" && accept.includes("text/html")) {
-      return reply.sendFile("index.html");
+// Explicit route to serve index.html
+app.get("/", async (req, reply) => {
+  const fs = await import('fs');
+  const indexPath = path.resolve(__dirname, "../../dist/index.html");
+  
+  try {
+    const html = fs.readFileSync(indexPath, 'utf-8');
+    return reply.type('text/html').send(html);
+  } catch (error) {
+    app.log.error({ error, indexPath }, "Failed to serve index.html");
+    return reply.code(500).send({ error: "Failed to load page" });
+  }
+});
+
+// Serve static assets
+app.get("/assets/*", async (req, reply) => {
+  const fs = await import('fs');
+  const assetPath = path.resolve(__dirname, "../../dist", req.url.substring(1));
+  
+  try {
+    if (!fs.existsSync(assetPath)) {
+      return reply.code(404).send({ error: "Asset not found" });
     }
-    return reply.code(404).send({ error: "Not found" });
-  });
-}
+    
+    const content = fs.readFileSync(assetPath);
+    const ext = path.extname(assetPath).toLowerCase();
+    
+    // Set appropriate content type
+    if (ext === '.css') {
+      reply.type('text/css');
+    } else if (ext === '.js') {
+      reply.type('application/javascript');
+    } else if (ext === '.png') {
+      reply.type('image/png');
+    } else if (ext === '.svg') {
+      reply.type('image/svg+xml');
+    }
+    
+    return reply.send(content);
+  } catch (error) {
+    app.log.error({ error, assetPath }, "Failed to serve asset");
+    return reply.code(500).send({ error: "Failed to load asset" });
+  }
+});
 
 // ----------------------------------------------------------
 // ⚡ Warm-up
