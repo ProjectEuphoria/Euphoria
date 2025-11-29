@@ -67,6 +67,7 @@ export default function ChattingPage() {
   const { name = "" } = useParams<{ name: string }>();
   const navigate = useNavigate();
 
+  const [history, setHistory] = useState<Array<{ role: "user" | "assistant"; content: string }>>([]);
   const [input, setInput] = useState("");
   const [userLocked, setUserLocked] = useState<string>("");
   const [aiReply, setAiReply] = useState<string>("");
@@ -152,6 +153,7 @@ export default function ChattingPage() {
     setUserLocked("");
     setAiReply("");
     setInput("");
+    setHistory([]);
     stopAudio();
     setSpeechMarks([]);
     setRenderedReply("");
@@ -466,6 +468,7 @@ export default function ChattingPage() {
     setInput("");
     setAiReply("…");
     setSending(true);
+    setHistory((prev) => [...prev, { role: "user", content: msg }]);
     setSpeechMarks([]);
     setRenderedReply("");
     setStreaming(false);
@@ -475,7 +478,7 @@ export default function ChattingPage() {
       const res = await fetch(`${API_BASE_URL}/agents/${name}/ask`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ input: msg }),
+        body: JSON.stringify({ input: msg, history }),
         signal: controllerRef.current.signal,
       });
 
@@ -494,6 +497,7 @@ export default function ChattingPage() {
       setRenderedReply("");
       setStreaming(false);
       setAiReply(String(data.reply ?? ""));
+      setHistory((prev) => [...prev, { role: "assistant", content: String(data.reply ?? "") }]);
     } catch (e: any) {
       if (e?.name !== "AbortError") {
         const message = `⚠️ ${e?.message ?? String(e)}`;
@@ -517,6 +521,7 @@ export default function ChattingPage() {
     setUserLocked("");
     setAiReply("");
     setInput("");
+    setHistory([]);
     ttsAbortRef.current?.abort();
     stopAudio();
     setRenderedReply("");

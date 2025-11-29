@@ -1,7 +1,14 @@
 
-# EUPHORIA
+# EMPARIO (EUPHORIA BUILD)
 
-Human-feeling AI personas that adapt tone and behavior in real time, with tool-use, memory, and clean web delivery.
+Human-feeling AI companions (Gen Z-first) that adapt tone and behavior in real time, with tools, memory, and safety rails.
+
+> Empario gives loneliness a cast of friends — safe, stylish AI companions who listen, motivate, and care.
+
+**Problem:** Modern feeds connect clicks, not people; users feel unseen and alone. Therapy is costly; most “AI friends” feel shallow or unsafe.  
+**Solution:** A cast of distinct, safe personas (Helena, Luna, Milo, Kai, Sophie) that deliver PG-13 companionship with clear boundaries, quick actions, and warmth.
+
+[Vision & narrative](docs/EMPARIO_VISION.md)
 
 > Personas: **Helena, Luna, Milo, Kai, Sophie**  
 > Runtime model: `gemini-2.5-flash` by default (swap per persona)  
@@ -137,7 +144,8 @@ Each `agents/<Persona>/agent.ts` builds an instruction with:
 #### 1) Environment
 Create `.env` at project root:
 ```bash
-# OpenAI
+# Models
+GOOGLE_AI_API_KEY=ai-...
 OPENAI_API_KEY=sk-...
 
 # AWS (for Polly; optional)
@@ -150,6 +158,29 @@ POLLY_BUCKET=euphoria-media-<yourid>
 PORT=5173
 API_PORT=8787
 NODE_ENV=development
+COOKIE_SECRET=change-me-in-prod
+
+# Messaging (tools)
+TELEGRAM_BOT_TOKEN=bot-token-from-botfather
+TELEGRAM_DEFAULT_CHAT_ID=123456789
+TELEGRAM_HELENA_TOKEN=    # optional persona token override
+TELEGRAM_LUNA_TOKEN=
+TELEGRAM_MILO_TOKEN=
+TELEGRAM_KAI_TOKEN=
+TELEGRAM_SOPHIE_TOKEN=
+HELENA_USERNAME=@helena_bot_username   # or *_CHAT_ID if you prefer numeric/chat ids
+DISCORD_BOT_TOKEN=bot-token-from-discord-dev-portal
+DISCORD_DEFAULT_CHANNEL_ID=123456789012345678
+DISCORD_HELENA_TOKEN=    # optional persona token override
+DISCORD_LUNA_TOKEN=
+DISCORD_MILO_TOKEN=
+DISCORD_KAI_TOKEN=
+DISCORD_SOPHIE_TOKEN=
+HELENA_DISCORD_CHANNEL=123...          # per-persona channel overrides (optional)
+
+# Spotify (tools)
+SPOTIFY_CLIENT_ID=your-spotify-client-id
+SPOTIFY_CLIENT_SECRET=your-spotify-client-secret
 ````
 
 #### 2) Install & run

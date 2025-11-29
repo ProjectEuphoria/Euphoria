@@ -14,7 +14,7 @@ export interface Tool {
 }
 
 export interface Runner {
-  ask: (input: string) => Promise<string>;
+  ask: (input: string, history?: Array<{ role: string; content: string }>) => Promise<string>;
 }
 
 export class AgentBuilder {
@@ -51,8 +51,17 @@ export class AgentBuilder {
     });
 
     const runner: Runner = {
-      ask: async (input: string): Promise<string> => {
+      ask: async (input: string, history?: Array<{ role: string; content: string }>): Promise<string> => {
         try {
+          // Build lightweight context from recent turns
+          const recent = Array.isArray(history) ? history.slice(-8) : [];
+          const historyText = recent
+            .map((h) => `${h.role === "assistant" ? "You" : "User"}: ${h.content}`)
+            .join("\n");
+          const prompt = historyText
+            ? `Conversation so far:\n${historyText}\n\nUser (now): ${input}\nRespond as ${this.name}.`
+            : input;
+
           // Convert tools to Google AI format
           const functionDeclarations = this.tools.map(tool => ({
             name: tool.name,
@@ -68,7 +77,7 @@ export class AgentBuilder {
               })
             : model;
 
-          const result = await modelWithTools.generateContent(input);
+          const result = await modelWithTools.generateContent(prompt);
           const response = result.response;
 
           // Handle function calls
@@ -81,7 +90,7 @@ export class AgentBuilder {
               
               // Send function result back to model
               const followUpResult = await modelWithTools.generateContent([
-                { text: input },
+                { text: prompt },
                 { functionCall: functionCall },
                 { functionResponse: { name: functionCall.name, response: toolResult } }
               ]);

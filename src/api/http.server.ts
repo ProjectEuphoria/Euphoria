@@ -87,7 +87,7 @@ app.post<{
 }>("/adk/agents/:name/ask", async (req, reply) => {
   try {
     const { name } = req.params;
-    const { input } = req.body ?? {};
+    const { input, history } = req.body ?? {};
     
     if (!input || typeof input !== "string") {
       return reply.code(400).send({ error: 'Missing "input" string in body' });
@@ -98,7 +98,7 @@ app.post<{
       return reply.code(404).send({ error: `Agent ${name} not found` });
     }
 
-    const result = await runner.ask(input);
+    const result = await runner.ask(input, Array.isArray(history) ? history : undefined);
     return { 
       reply: typeof result === "string" ? result : String(result),
       persona: name,
