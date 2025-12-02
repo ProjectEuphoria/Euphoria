@@ -1,16 +1,32 @@
 import type { FastifyInstance } from "fastify";
 import bcrypt from "bcryptjs";
-import { pool } from "../../db";
 import { z } from "zod";
 import { randomBytes } from "crypto";
+import { getSupabaseClient, isSupabaseConfigured } from "../services/supabaseClient.js";
 
 const SignInSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8),
 });
 
+const MAX_DAYS = 30;
+const DEFAULT_DAYS = 7;
+const sessionDays = Math.min(
+  MAX_DAYS,
+  Math.max(1, Number(process.env.SESSION_MAX_AGE_DAYS || DEFAULT_DAYS)),
+);
+const sessionSeconds = sessionDays * 24 * 60 * 60;
+
 export default async function signinRoute(app: FastifyInstance) {
   app.post("/auth/signin", async (req, reply) => {
+    if (!isSupabaseConfigured()) {
+      return reply.code(503).send({
+        ok: false,
+        error: "Auth temporarily unavailable",
+        detail: "Supabase is not configured. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY on the server.",
+      });
+    }
+
     try {
       // 1️⃣ Validate payload
       const parsed = SignInSchema.safeParse(req.body);
@@ -23,37 +39,51 @@ export default async function signinRoute(app: FastifyInstance) {
       }
 
       const { email, password } = parsed.data;
+      const supabase = getSupabaseClient();
 
       // 2️⃣ Check user exists
-      const [rows] = await pool.query("SELECT * FROM users WHERE email = ?", [email]);
-      const users = rows as any[];
-      if (!users.length) return reply.code(404).send({ ok: false, error: "User not found" });
-      const user = users[0];
+      const { data: user, error: userErr } = await supabase
+        .from("users")
+        .select("*")
+        .eq("email", email)
+        .maybeSingle();
+      if (userErr && userErr.code !== "PGRST116") {
+        throw userErr;
+      }
+      if (!user) return reply.code(404).send({ ok: false, error: "User not found" });
 
       // 3️⃣ Verify password
       const isMatch = await bcrypt.compare(password, user.password_hash);
       if (!isMatch) return reply.code(401).send({ ok: false, error: "Invalid credentials" });
 
       // 4️⃣ Check if an active session exists
-      const [existing] = await pool.query(
-        "SELECT id FROM sessions WHERE email = ? AND expire_at > NOW() LIMIT 1",
-        [email]
-      );
-      const sessions = existing as any[];
-      let sid: string;
+      const nowIso = new Date().toISOString();
+      const { data: existingSession, error: sessionErr } = await supabase
+        .from("sessions")
+        .select("id")
+        .eq("email", email)
+        .eq("user_id", user.id)
+        .gt("expire_at", nowIso)
+        .order("expire_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (sessionErr && sessionErr.code !== "PGRST116") throw sessionErr;
 
-      if (sessions.length) {
-        sid = sessions[0].id;
-        // Optional: extend session lifetime on reuse
-        await pool.execute("UPDATE sessions SET expire_at = NOW() + INTERVAL 30 DAY WHERE id = ?", [sid]);
+      let sid = existingSession?.id as string | undefined;
+      const expireAt = new Date(Date.now() + sessionSeconds * 1000).toISOString();
+
+      if (sid) {
+        await supabase.from("sessions").update({ expire_at: expireAt }).eq("id", sid);
       } else {
-        // Create new session
         sid = randomBytes(32).toString("hex");
-        await pool.execute(
-          `INSERT INTO sessions (id, user_id, name, email, expire_at)
-           VALUES (?, ?, ?, ?, NOW() + INTERVAL 30 DAY)`,
-          [sid, user.id, user.name, user.email]
-        );
+        const { error: insertSessionErr } = await supabase.from("sessions").insert({
+          id: sid,
+          user_id: user.id,
+          name: user.name,
+          email: user.email,
+          expire_at: expireAt,
+        });
+        if (insertSessionErr) throw insertSessionErr;
       }
 
       // 5️⃣ Set secure cookie so frontend auto-stays logged in
@@ -61,9 +91,9 @@ export default async function signinRoute(app: FastifyInstance) {
         .setCookie("sid", sid, {
           httpOnly: true,
           sameSite: "lax",
-          secure: false, // true in production w/ HTTPS
+          secure: process.env.NODE_ENV === "production",
           path: "/",
-          maxAge: 60 * 60 * 24 * 30, // 30 days
+          maxAge: sessionSeconds,
         })
         .send({
           ok: true,

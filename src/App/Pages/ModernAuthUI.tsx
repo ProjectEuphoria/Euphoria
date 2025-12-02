@@ -100,16 +100,19 @@ export default function ModernAuthUI() {
       setLoading(true);
       const payload = isSignIn ? { email, password } : { email, password, displayName };
 
-      const res = isSignIn ? await fetch(`${API_BASE_URL}/api/auth/signin`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(payload)
-      }) : await fetch(`${API_BASE_URL}/api/auth/signup`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+      const res = isSignIn
+        ? await fetch(`${API_BASE_URL}/api/auth/signin`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify(payload)
+          })
+        : await fetch(`${API_BASE_URL}/api/auth/signup`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify(payload),
+          });
       const data = await res.json()
       console.log(data)
       if (data.error) {
@@ -157,7 +160,10 @@ export default function ModernAuthUI() {
     msg ? <p className="mt-1 text-[11px] text-red-300">{msg}</p> : null;
 
   return (
-    <div className="relative min-h-screen flex items-center justify-center text-white overflow-hidden" style={{ backgroundColor: "#040026" }}>
+    <div
+      className="relative min-h-screen flex items-center justify-center text-white overflow-hidden px-4 py-10 sm:py-16"
+      style={{ backgroundColor: "#040026" }}
+    >
       {/* Background */}
       <div className="pointer-events-none fixed inset-0 ">
         <LiquidEther
@@ -181,7 +187,7 @@ export default function ModernAuthUI() {
 
       {/* Card */}
       <motion.div
-        className="w-[90%] max-w-lg rounded-2xl border border-[rgba(255,255,255,0.15)] bg-[rgba(255,255,255,0.06)] backdrop-blur-xl shadow-[0_0_25px_rgba(150,0,255,0.3)] p-8"
+        className="w-full max-w-lg rounded-2xl border border-[rgba(255,255,255,0.15)] bg-[rgba(255,255,255,0.06)] backdrop-blur-xl shadow-[0_0_25px_rgba(150,0,255,0.3)] p-6 sm:p-8 max-h-[90vh] overflow-y-auto"
         variants={panelVariants}
         initial="initial"
         animate="animate"

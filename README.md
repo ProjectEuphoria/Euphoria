@@ -181,6 +181,13 @@ HELENA_DISCORD_CHANNEL=123...          # per-persona channel overrides (optional
 # Spotify (tools)
 SPOTIFY_CLIENT_ID=your-spotify-client-id
 SPOTIFY_CLIENT_SECRET=your-spotify-client-secret
+
+# Supabase (long-term memory; service role key server-side only)
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+
+# MySQL schema
+# Run docs/db-schema.sql to create users, sessions, and memory tables
 ````
 
 #### 2) Install & run
@@ -365,3 +372,10 @@ Proprietary — © You (2025).
 If you want, I can also generate a **`.env.example`**, a **SAM/CloudFormation** snippet for the Polly Lambda + API, or a **diagram image** (Mermaid) you can drop into the README.
 ::contentReference[oaicite:0]{index=0}
 ```
+# Database (auth stubs)
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_USER=appuser
+DB_PASSWORD=supersecret
+DB_NAME=Euphoria
+# Run docs/db-schema.sql to create users + sessions tables

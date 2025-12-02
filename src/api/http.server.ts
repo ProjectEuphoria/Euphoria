@@ -5,6 +5,7 @@ import cookie from "@fastify/cookie";
 import fastifyStatic from "@fastify/static";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { randomUUID } from "node:crypto";
 import dotenv from "dotenv";
 
 import { makeRunnerByName, prewarmRunners } from "./adapters/runner-adapter.js";
@@ -13,11 +14,40 @@ import signinRoute from "./auth/signin.js";
 import { authCheckRoute } from "./auth/check.js";
 import { logoutRoute } from "./auth/logout.js";
 import ttsRoute from "./tts/route.js";
+import memoryRoutes from "./memory.js";
+import { requireSession } from "../middleware/requireSession.js";
+import { z } from "zod";
+import { ensureSupabaseSchema } from "./services/supabaseSchema.js";
 
 // Only load .env in development
 if (process.env.NODE_ENV !== 'production') {
   dotenv.config();
 }
+
+// Simple fixed-window rate limiter per key (ip)
+type RateLimiter = (req: any, reply: any) => boolean;
+function createRateLimiter(windowMs: number, max: number): RateLimiter {
+  const buckets = new Map<string, { count: number; reset: number }>();
+  return (req, reply) => {
+    const key = req.ip || req.headers["x-forwarded-for"] || "unknown";
+    const now = Date.now();
+    const bucket = buckets.get(key);
+    if (!bucket || bucket.reset <= now) {
+      buckets.set(key, { count: 1, reset: now + windowMs });
+      return true;
+    }
+    if (bucket.count >= max) {
+      const retryAfter = Math.max(1, Math.ceil((bucket.reset - now) / 1000));
+      reply.code(429).send({ error: "Too many requests", retryAfter });
+      return false;
+    }
+    bucket.count += 1;
+    return true;
+  };
+}
+
+const authLimiter = createRateLimiter(60_000, 30); // 30 req/min per ip for auth
+const agentLimiter = createRateLimiter(60_000, 120); // 120 req/min per ip for chat
 
 // ----------------------------------------------------------
 // 🔧 Setup
@@ -25,13 +55,25 @@ if (process.env.NODE_ENV !== 'production') {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+const loggerTransport = process.env.NODE_ENV === "development"
+  ? (() => {
+      try {
+        return {
+          target: "pino-pretty",
+          options: { translateTime: "SYS:standard", ignore: "pid,hostname" },
+        };
+      } catch {
+        return undefined;
+      }
+    })()
+  : undefined;
+
 const app = Fastify({ 
   logger: {
     level: process.env.LOG_LEVEL || 'info',
-    transport: process.env.NODE_ENV === 'development' ? {
-      target: 'pino-pretty'
-    } : undefined
+    transport: loggerTransport
   },
+  genReqId: () => randomUUID(),
   trustProxy: true,
   disableRequestLogging: process.env.NODE_ENV === 'production'
 });
@@ -69,6 +111,52 @@ await app.register(cors, {
 const cookieSecret = process.env.COOKIE_SECRET || "euphoria-default-secret-change-in-production";
 await app.register(cookie, { secret: cookieSecret });
 
+// Ensure Supabase tables exist when credentials allow a direct Postgres connection
+await ensureSupabaseSchema();
+
+// Lightweight rate limiting for auth + agent endpoints
+app.addHook("onRequest", async (req, reply) => {
+  const url = req.url || "";
+  reply.header("x-request-id", req.id);
+  if (url.startsWith("/adk/api/auth/")) {
+    if (!authLimiter(req, reply)) return reply; // limiter already sent response
+  } else if (url.startsWith("/adk/agents/")) {
+    if (!agentLimiter(req, reply)) return reply;
+  }
+});
+
+// Enforce HTTPS in production via simple redirect + HSTS
+if (process.env.NODE_ENV === "production") {
+  app.addHook("onRequest", async (req, reply) => {
+    const proto = req.headers["x-forwarded-proto"] || req.protocol;
+    if (proto !== "https") {
+      const host = req.headers.host;
+      if (host) {
+        return reply.redirect(301, `https://${host}${req.raw.url}`);
+      }
+    }
+  });
+
+  app.addHook("onSend", async (_req, reply, payload) => {
+    reply.header("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+    return payload;
+  });
+}
+
+const askBodySchema = z.object({
+  input: z.string().min(1).max(4000),
+  history: z
+    .array(
+      z.object({
+        role: z.enum(["user", "assistant"]),
+        content: z.string().min(1).max(4000),
+      })
+    )
+    .optional(),
+  memory: z.string().max(6000).optional(),
+  userId: z.string().optional(),
+});
+
 // ----------------------------------------------------------
 // 🔐 API Routes
 // ----------------------------------------------------------
@@ -77,28 +165,36 @@ await app.register(signinRoute, { prefix: "/adk/api" });
 await app.register(authCheckRoute, { prefix: "/adk/api" });
 await app.register(logoutRoute, { prefix: "/adk/api" });
 await app.register(ttsRoute, { prefix: "/adk/api" });
+await app.register(async (instance) => {
+  instance.addHook("preHandler", requireSession);
+  await memoryRoutes(instance);
+}, { prefix: "/adk/api" });
 
 // ----------------------------------------------------------
 // 🤖 Agent Chat Route
 // ----------------------------------------------------------
 app.post<{
   Params: { name: string };
-  Body: { input: string; history?: Array<{ role: string; content: string }> };
+  Body: { input: string; history?: Array<{ role: string; content: string }>; memory?: string; userId?: string };
 }>("/adk/agents/:name/ask", async (req, reply) => {
   try {
     const { name } = req.params;
-    const { input, history } = req.body ?? {};
-    
-    if (!input || typeof input !== "string") {
-      return reply.code(400).send({ error: 'Missing "input" string in body' });
+    const parsed = askBodySchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      return reply.code(400).send({ error: "Invalid input", details: parsed.error.flatten() });
     }
+    const { input, history, memory } = parsed.data;
 
     const runner = await makeRunnerByName(name);
     if (!runner?.ask) {
       return reply.code(404).send({ error: `Agent ${name} not found` });
     }
 
-    const result = await runner.ask(input, Array.isArray(history) ? history : undefined);
+    const result = await runner.ask(
+      input,
+      Array.isArray(history) ? history : undefined,
+      typeof memory === "string" ? memory : undefined
+    );
     return { 
       reply: typeof result === "string" ? result : String(result),
       persona: name,

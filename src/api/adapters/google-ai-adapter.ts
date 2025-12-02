@@ -14,7 +14,7 @@ export interface Tool {
 }
 
 export interface Runner {
-  ask: (input: string, history?: Array<{ role: string; content: string }>) => Promise<string>;
+  ask: (input: string, history?: Array<{ role: string; content: string }>, memory?: string) => Promise<string>;
 }
 
 export class AgentBuilder {
@@ -51,16 +51,22 @@ export class AgentBuilder {
     });
 
     const runner: Runner = {
-      ask: async (input: string, history?: Array<{ role: string; content: string }>): Promise<string> => {
+      ask: async (input: string, history?: Array<{ role: string; content: string }>, memory?: string): Promise<string> => {
         try {
           // Build lightweight context from recent turns
           const recent = Array.isArray(history) ? history.slice(-8) : [];
           const historyText = recent
             .map((h) => `${h.role === "assistant" ? "You" : "User"}: ${h.content}`)
             .join("\n");
+          const memoryText = typeof memory === "string" && memory.trim().length
+            ? `Known about user (persisted):\n${memory.slice(0, 1200)}\n---\n`
+            : "";
+          const memoryCue = memoryText
+            ? "Use the persisted notes above as true. If they include the user's name or facts, recall them explicitly. Do not say you cannot remember when notes are present."
+            : "";
           const prompt = historyText
-            ? `Conversation so far:\n${historyText}\n\nUser (now): ${input}\nRespond as ${this.name}.`
-            : input;
+            ? `${memoryText}${memoryCue ? `${memoryCue}\n` : ""}Conversation so far:\n${historyText}\n\nUser (now): ${input}\nRespond as ${this.name}.`
+            : `${memoryText}${memoryCue ? `${memoryCue}\n` : ""}${input}`;
 
           // Convert tools to Google AI format
           const functionDeclarations = this.tools.map(tool => ({

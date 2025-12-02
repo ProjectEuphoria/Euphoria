@@ -19,6 +19,7 @@ export default defineConfig([
       '@fastify/cookie', 
       '@fastify/static',
       '@google/generative-ai',
+      'pg',
       'dotenv'
     ],
     esbuildOptions(options) {

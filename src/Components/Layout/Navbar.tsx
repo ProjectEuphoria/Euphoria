@@ -1,12 +1,16 @@
 import { type FC, useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "../ui/button";
 import { Menu, X, Home, Users, Info } from "lucide-react";
 import logoSvg from "../../assets/logo.svg";
+import { useAuth } from "../../hooks/useAuth";
+import { API_BASE_URL } from "../../config/api";
 
 const Navbar: FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
+  const auth = useAuth();
 
   const navItems = [
     { href: "/", label: "Home", icon: <Home className="h-4 w-4" /> },
@@ -16,9 +20,22 @@ const Navbar: FC = () => {
 
   const isActive = (path: string) => location.pathname === path;
 
+  async function handleLogout() {
+    try {
+      await fetch(`${API_BASE_URL}/api/auth/logout`, {
+        method: "POST",
+        credentials: "include",
+      });
+    } catch {
+      /* ignore logout errors */
+    } finally {
+      navigate("/", { replace: true });
+    }
+  }
+
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-black/20 backdrop-blur-md border-b border-white/10">
-      <div className="max-w-7xl mx-auto px-6">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link to="/" className="flex items-center gap-1 group">
@@ -48,6 +65,37 @@ const Navbar: FC = () => {
                 </Button>
               </Link>
             ))}
+
+            {auth.status === "authed" ? (
+              <>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-white/85 hover:text-white hover:bg-white/10 border border-transparent hover:border-white/20"
+                  disabled
+                >
+                  Signed in as {auth.user.name}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="border-white/30 text-white hover:bg-white/10"
+                  onClick={handleLogout}
+                >
+                  Log out
+                </Button>
+              </>
+            ) : (
+              <Link to="/auth">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="border-white/30 text-white hover:bg-white/10"
+                >
+                  Sign in
+                </Button>
+              </Link>
+            )}
           </div>
 
           {/* Mobile menu button */}
@@ -81,6 +129,39 @@ const Navbar: FC = () => {
                   </Button>
                 </Link>
               ))}
+              {auth.status === "authed" ? (
+                <>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-full justify-start text-white/85 hover:text-white hover:bg-white/10 border border-transparent hover:border-white/20"
+                    disabled
+                  >
+                    Signed in as {auth.user.name}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full justify-start border-white/30 text-white hover:bg-white/10"
+                    onClick={() => {
+                      setIsOpen(false);
+                      void handleLogout();
+                    }}
+                  >
+                    Log out
+                  </Button>
+                </>
+              ) : (
+                <Link to="/auth" onClick={() => setIsOpen(false)}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full justify-start border-white/30 text-white hover:bg-white/10"
+                  >
+                    Sign in
+                  </Button>
+                </Link>
+              )}
             </div>
           </div>
         )}

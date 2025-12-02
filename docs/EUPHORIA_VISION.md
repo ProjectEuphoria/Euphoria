@@ -1,4 +1,4 @@
-# 🚀 Empario – The Future of AI Companionship
+# 🚀 Euphoria – The Future of AI Companionship
 
 ## 1. The Problem: Loneliness in the Digital Age
 Modern life connects us digitally but disconnects us emotionally. Feeds reward clicks, not care. People need comfort, encouragement, or simply someone to listen — but today they get:

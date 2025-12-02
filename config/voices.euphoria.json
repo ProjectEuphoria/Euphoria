@@ -63,24 +63,6 @@
       }
     },
     "Kai": {
-      "base": "Matthew",
-      "lang": "en-US",
-      "engine": "neural",
-      "ageHint": "19",
-      "generative": {
-        "pitchSemitones": 0.3,
-        "ratePct": 8,
-        "eq": { "lowShelfDb": 0, "presenceDb": 2.0, "airDb": 1.0 },
-        "reverb": { "mix": 0.02, "predelayMs": 5, "room": "booth" },
-        "breath": { "prob": 0.09, "type": "smile-breath", "maxPerUtterance": 2 },
-        "prosody": {
-          "defaultContour": "dynamic",
-          "pauseMs": { "comma": 60, "period": 110, "paragraph": 200 },
-          "emphasis": { "liftDb": 2.0, "tilt": "up" }
-        }
-      }
-    },
-    "Milo": {
       "base": "Kevin",
       "lang": "en-US",
       "engine": "neural",
@@ -95,6 +77,24 @@
           "defaultContour": "grounded",
           "pauseMs": { "comma": 85, "period": 150, "paragraph": 260 },
           "emphasis": { "liftDb": 1.0, "tilt": "slight-down" }
+        }
+      }
+    },
+    "Milo": {
+      "base": "Matthew",
+      "lang": "en-US",
+      "engine": "neural",
+      "ageHint": "19",
+      "generative": {
+        "pitchSemitones": 0.3,
+        "ratePct": 8,
+        "eq": { "lowShelfDb": 0, "presenceDb": 2.0, "airDb": 1.0 },
+        "reverb": { "mix": 0.02, "predelayMs": 5, "room": "booth" },
+        "breath": { "prob": 0.09, "type": "smile-breath", "maxPerUtterance": 2 },
+        "prosody": {
+          "defaultContour": "dynamic",
+          "pauseMs": { "comma": 60, "period": 110, "paragraph": 200 },
+          "emphasis": { "liftDb": 2.0, "tilt": "up" }
         }
       }
     }

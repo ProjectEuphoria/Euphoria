@@ -1,9 +1,11 @@
 // src/Pages/ChattingPage.tsx
 import { useEffect, useRef, useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, ChevronLeft, ChevronRight, Sparkles, Volume2, VolumeX } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, Sparkles, Volume2, VolumeX, Users } from "lucide-react";
 import { buildChatUrl } from "../../utils/url";
 import { API_BASE_URL } from "../../config/api";
+import { buildMemorySnapshot, buildMemoryString, getOrCreateUserId, loadLocalMemory, saveLocalMemory } from "../../utils/memory";
+import { useAuth } from "../../hooks/useAuth";
 
 type AskResponse = { reply?: string; error?: string };
 
@@ -67,6 +69,12 @@ export default function ChattingPage() {
   const { name = "" } = useParams<{ name: string }>();
   const navigate = useNavigate();
 
+  const auth = useAuth();
+  const [userId] = useState<string>(() => getOrCreateUserId());
+  const [personaMemory, setPersonaMemory] = useState<string>("");
+  const [memoryPanel, setMemoryPanel] = useState(false);
+  const [profileDraft, setProfileDraft] = useState<string>("");
+  const [memories, setMemories] = useState<Array<{ id?: string; title?: string; body?: string }>>([]);
   const [history, setHistory] = useState<Array<{ role: "user" | "assistant"; content: string }>>([]);
   const [input, setInput] = useState("");
   const [userLocked, setUserLocked] = useState<string>("");
@@ -190,6 +198,47 @@ export default function ChattingPage() {
       animationFrameRef.current = null;
     }
   };
+
+  // Load memory (local first, then Supabase) when persona changes
+  const effectiveUserId = auth.status === "authed" ? String(auth.user.id) : userId;
+
+  useEffect(() => {
+    if (!effectiveUserId || !canonicalPersona) return;
+    const local = loadLocalMemory(effectiveUserId, canonicalPersona);
+    if (local?.memory) {
+      setPersonaMemory(local.memory);
+    } else {
+      setPersonaMemory("");
+    }
+
+    if (auth.status !== "authed") return;
+
+    const controller = new AbortController();
+    (async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/memory/bundle`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ userId: effectiveUserId, persona: canonicalPersona }),
+          signal: controller.signal,
+        });
+        if (!res.ok) return;
+        const payload = await res.json();
+        if (payload?.bundle) {
+          const memString = buildMemoryString(payload.bundle);
+          setPersonaMemory(memString);
+          setProfileDraft(JSON.stringify(payload.bundle.profile ?? {}, null, 2));
+          setMemories(payload.bundle.memories ?? []);
+          saveLocalMemory(effectiveUserId, canonicalPersona, memString);
+        }
+      } catch {
+        /* ignore load errors */
+      }
+    })();
+
+    return () => controller.abort();
+  }, [canonicalPersona, effectiveUserId, auth.status]);
 
   useEffect(() => {
     if (!aiReply || aiReply === "…" || aiReply.startsWith("⚠️")) {
@@ -443,6 +492,9 @@ export default function ChattingPage() {
   function togglePanel() {
     setPanelOpen((v) => !v);
   }
+  function toggleMemoryPanel() {
+    setMemoryPanel((v) => !v);
+  }
 
   function startVoice() {
     if (!recognitionRef.current) {
@@ -464,11 +516,13 @@ export default function ChattingPage() {
     controllerRef.current?.abort();
     controllerRef.current = new AbortController();
 
+    const nextHistory = [...history, { role: "user", content: msg }];
+
     setUserLocked(msg);
     setInput("");
     setAiReply("…");
     setSending(true);
-    setHistory((prev) => [...prev, { role: "user", content: msg }]);
+    setHistory(nextHistory);
     setSpeechMarks([]);
     setRenderedReply("");
     setStreaming(false);
@@ -478,7 +532,12 @@ export default function ChattingPage() {
       const res = await fetch(`${API_BASE_URL}/agents/${name}/ask`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ input: msg, history }),
+        body: JSON.stringify({
+          input: msg,
+          history: nextHistory,
+          memory: auth.status === "authed" ? personaMemory : "",
+          userId: auth.status === "authed" ? effectiveUserId : undefined,
+        }),
         signal: controllerRef.current.signal,
       });
 
@@ -496,8 +555,21 @@ export default function ChattingPage() {
       setSpeechMarks([]);
       setRenderedReply("");
       setStreaming(false);
-      setAiReply(String(data.reply ?? ""));
-      setHistory((prev) => [...prev, { role: "assistant", content: String(data.reply ?? "") }]);
+      const replyText = String(data.reply ?? "");
+      setAiReply(replyText);
+      const updatedHistory = [...nextHistory, { role: "assistant", content: replyText }];
+      setHistory(updatedHistory);
+      const snapshot = buildMemorySnapshot(updatedHistory);
+      if (auth.status === "authed") {
+        setPersonaMemory(snapshot);
+        saveLocalMemory(effectiveUserId, canonicalPersona, snapshot);
+        void fetch(`${API_BASE_URL}/api/memory/save`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ userId: effectiveUserId, persona: canonicalPersona, data: snapshot }),
+        }).catch(() => {});
+      }
     } catch (e: any) {
       if (e?.name !== "AbortError") {
         const message = `⚠️ ${e?.message ?? String(e)}`;
@@ -532,6 +604,93 @@ export default function ChattingPage() {
 
   return (
     <div className="min-h-screen w-full relative">
+      {/* Memory panel */}
+      {memoryPanel && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={toggleMemoryPanel} />
+          <div className="relative w-full max-w-3xl rounded-2xl border border-white/20 bg-black/80 text-white shadow-2xl p-4 sm:p-6 space-y-4 max-h-[80vh] overflow-y-auto">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg sm:text-xl font-semibold">What I remember</h3>
+              <button
+                type="button"
+                onClick={toggleMemoryPanel}
+                className="text-sm text-white/70 hover:text-white"
+              >
+                Close
+              </button>
+            </div>
+            {auth.status === "authed" ? (
+              <>
+                <div className="space-y-2">
+                  <label className="text-xs uppercase tracking-wide text-white/60">Profile JSON</label>
+                  <textarea
+                    className="w-full min-h-[140px] rounded-xl border border-white/15 bg-white/5 px-3 py-2 text-sm text-white outline-none"
+                    value={profileDraft}
+                    onChange={(e) => setProfileDraft(e.target.value)}
+                    placeholder='{"name":"...","likes":["..."],"boundaries":["..."]}'
+                  />
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        const parsed = profileDraft.trim() ? JSON.parse(profileDraft) : {};
+                        await fetch(`${API_BASE_URL}/api/memory/profile`, {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          credentials: "include",
+                          body: JSON.stringify({ userId: effectiveUserId, profile: parsed }),
+                        });
+                      } catch (error) {
+                        console.error("Profile save failed", error);
+                      }
+                    }}
+                    className="rounded-lg bg-white/10 px-3 py-2 text-sm hover:bg-white/15 transition"
+                  >
+                    Save profile
+                  </button>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs uppercase tracking-wide text-white/60">Key memories (latest)</label>
+                  <div className="space-y-3">
+                    {memories.length === 0 && <p className="text-sm text-white/60">No saved memories yet.</p>}
+                    {memories.map((m, idx) => (
+                      <div key={m.id ?? idx} className="rounded-lg border border-white/10 bg-white/5 p-3 text-sm">
+                        <div className="font-semibold">{m.title || `Note ${idx + 1}`}</div>
+                        <div className="text-white/70 whitespace-pre-wrap">{m.body}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const title = prompt("Title for this memory?") || "";
+                      const body = prompt("Body / details?") || "";
+                      if (!title && !body) return;
+                      try {
+                        await fetch(`${API_BASE_URL}/api/memory/entry`, {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          credentials: "include",
+                          body: JSON.stringify({ userId: effectiveUserId, persona: canonicalPersona, title, body }),
+                        });
+                        setMemories((prev) => [{ title, body }, ...prev].slice(0, 5));
+                      } catch (error) {
+                        console.error("Add memory failed", error);
+                      }
+                    }}
+                    className="rounded-lg bg-white/10 px-3 py-2 text-sm hover:bg-white/15 transition"
+                  >
+                    Add memory
+                  </button>
+                </div>
+              </>
+            ) : (
+              <p className="text-sm text-white/70">Memory sync is for logged-in users. You’re in guest mode.</p>
+            )}
+          </div>
+        </div>
+      )}
       {/* Background - Video for all personas */}
       <video
         key={normalizedName}
@@ -636,15 +795,26 @@ export default function ChattingPage() {
        
       </div>
       <div className="absolute top-4 right-4 z-10">
-        <button
-          type="button"
-          onClick={() => setMuted((prev) => !prev)}
-          className="flex items-center justify-center w-12 h-12 rounded-full border border-white/25 bg-black/45 text-white/80 backdrop-blur-xl shadow-lg transition hover:bg-white/10 hover:text-white"
-          aria-pressed={!muted}
-          aria-label={muted ? "Unmute voice playback" : "Mute voice playback"}
-        >
-          {muted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={toggleMemoryPanel}
+            className="flex items-center justify-center w-12 h-12 rounded-full border border-white/25 bg-black/45 text-white/80 backdrop-blur-xl shadow-lg transition hover:bg-white/10 hover:text-white"
+            title="View memory"
+            aria-label="View memory"
+          >
+            <Users className="h-5 w-5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setMuted((prev) => !prev)}
+            className="flex items-center justify-center w-12 h-12 rounded-full border border-white/25 bg-black/45 text-white/80 backdrop-blur-xl shadow-lg transition hover:bg-white/10 hover:text-white"
+            aria-pressed={!muted}
+            aria-label={muted ? "Unmute voice playback" : "Mute voice playback"}
+          >
+            {muted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
+          </button>
+        </div>
       </div>
 
       {/* ===== Messages Area (only this scrolls) ===== */}
@@ -693,7 +863,8 @@ export default function ChattingPage() {
       {/* ===== Fixed Bottom Bar (input + voice + send + new turn) ===== */}
       <form
         onSubmit={onSubmit}
-        className="fixed bottom-2 sm:bottom-3 left-0 right-0 z-10 px-3 sm:px-4 md:px-6"
+        className="fixed left-0 right-0 z-10 px-3 sm:px-4 md:px-6"
+        style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 8px)" }}
       >
         <div className="mx-auto max-w-3xl rounded-xl sm:rounded-2xl border border-white/20 bg-black/55 backdrop-blur-xl shadow-2xl px-2 sm:px-3 py-1.5 sm:py-2">
           <div className="flex items-center gap-1.5 sm:gap-2">
