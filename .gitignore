@@ -13,6 +13,7 @@ build/
 .env.local
 .env.production
 .env.development
+env.deploy.yaml
 
 # Logs
 logs/

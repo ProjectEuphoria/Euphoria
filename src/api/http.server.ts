@@ -54,6 +54,7 @@ const agentLimiter = createRateLimiter(60_000, 120); // 120 req/min per ip for c
 // ----------------------------------------------------------
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const resolveDistPath = (...parts: string[]) => path.resolve(__dirname, "..", ...parts);
 
 const loggerTransport = process.env.NODE_ENV === "development"
   ? (() => {
@@ -237,7 +238,7 @@ app.get("/version", async () => ({
 // Debug endpoint to check file system
 app.get("/debug/files", async () => {
   const fs = await import('fs');
-  const uiDir = path.resolve(__dirname, "../../dist");
+  const uiDir = resolveDistPath();
   
   try {
     const exists = fs.existsSync(uiDir);
@@ -262,7 +263,7 @@ app.get("/debug/files", async () => {
 // Explicit route to serve index.html
 app.get("/", async (req, reply) => {
   const fs = await import('fs');
-  const indexPath = path.resolve(__dirname, "../../dist/index.html");
+  const indexPath = resolveDistPath("index.html");
   
   try {
     const html = fs.readFileSync(indexPath, 'utf-8');
@@ -273,10 +274,56 @@ app.get("/", async (req, reply) => {
   }
 });
 
+// Generic static file handler for root-level files (e.g., /logo.png)
+app.get("/*", async (req, reply) => {
+  const fs = await import("fs");
+  const urlPath = req.url || "/";
+  const relPath = urlPath.replace(/^\//, "");
+
+  // Avoid intercepting API or assets routes
+  if (
+    urlPath.startsWith("/adk/") ||
+    urlPath.startsWith("/health") ||
+    urlPath.startsWith("/version") ||
+    urlPath.startsWith("/assets/")
+  ) {
+    return reply.code(404).send({ error: "Not found" });
+  }
+
+  const targetPath = relPath ? resolveDistPath(relPath) : resolveDistPath("index.html");
+  const indexPath = resolveDistPath("index.html");
+
+  try {
+    if (relPath && fs.existsSync(targetPath) && fs.statSync(targetPath).isFile()) {
+      return reply.type(getMimeType(targetPath)).send(fs.readFileSync(targetPath));
+    }
+    // Fallback to index.html for SPA routes
+    const html = fs.readFileSync(indexPath, "utf-8");
+    return reply.type("text/html").send(html);
+  } catch (error) {
+    app.log.error({ error, targetPath }, "Static file serve failed");
+    return reply.code(500).send({ error: "Failed to load asset" });
+  }
+});
+
+function getMimeType(filePath: string): string {
+  const ext = path.extname(filePath).toLowerCase();
+  if (ext === ".css") return "text/css";
+  if (ext === ".js") return "application/javascript";
+  if (ext === ".png") return "image/png";
+  if (ext === ".svg") return "image/svg+xml";
+  if (ext === ".jpg" || ext === ".jpeg") return "image/jpeg";
+  if (ext === ".json") return "application/json";
+  if (ext === ".txt") return "text/plain";
+  if (ext === ".ico") return "image/x-icon";
+  return "application/octet-stream";
+}
+
 // Serve static assets
 app.get("/assets/*", async (req, reply) => {
   const fs = await import('fs');
-  const assetPath = path.resolve(__dirname, "../../dist", req.url.substring(1));
+  const relPath = req.url.startsWith("/") ? req.url.substring(1) : req.url;
+  const assetPath = resolveDistPath(relPath);
   
   try {
     if (!fs.existsSync(assetPath)) {
